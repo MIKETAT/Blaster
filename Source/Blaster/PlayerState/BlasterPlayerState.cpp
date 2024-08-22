@@ -4,6 +4,7 @@
 #include "BlasterPlayerState.h"
 
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Net/UnrealNetwork.h"
 
 // Handle Score change both on server and on client 
 void ABlasterPlayerState::ScoreChange(float ScoreAmount)
@@ -19,18 +20,48 @@ void ABlasterPlayerState::ScoreChange(float ScoreAmount)
 	}
 }
 
+// Handle Defeats change
+void ABlasterPlayerState::DefeatsChange(int32 DefeatsAmount)
+{
+	Character = Character == nullptr ? Cast<ABlasterCharacter>(GetPawn()) : Character;
+	if (Character)
+	{
+		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
+		if (Controller)
+		{
+			Controller->SetHUDDefeats(DefeatsAmount);
+		}
+	}
+}
+
 // call it on the server
 void ABlasterPlayerState::AddToScore(float ScoreAmount)
 {
-	Score += ScoreAmount;
-	ScoreChange(Score);		// todo 填什么？
+	SetScore(GetScore() + ScoreAmount);
+	ScoreChange(GetScore());
 }
 
+void ABlasterPlayerState::AddToDefeats(int32 DefeatsAmount)
+{
+	Defeats += DefeatsAmount;
+	DefeatsChange(Defeats);
+}
+
+
+void ABlasterPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ABlasterPlayerState, Defeats);
+}
 
 void ABlasterPlayerState::OnRep_Score()
 {
 	Super::OnRep_Score();
-	UE_LOG(LogTemp, Error, TEXT("OnRep_Score"));
-	ScoreChange(Score);
+	ScoreChange(GetScore());
+}
+
+void ABlasterPlayerState::OnRep_Defeats()
+{
+	DefeatsChange(Defeats);
 }
 

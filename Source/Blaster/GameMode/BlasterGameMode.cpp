@@ -14,9 +14,10 @@ void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 	// Add Socore to Attacker
 	ABlasterPlayerState* AttackerState = AttackerController ? Cast<ABlasterPlayerState>(AttackerController->PlayerState) : nullptr;
 	ABlasterPlayerState* VictimState = AttackerController ? Cast<ABlasterPlayerState>(VictimController->PlayerState) : nullptr;
-	if (AttackerState && AttackerState != VictimState)
+	if (AttackerState && VictimState && AttackerState != VictimState)
 	{
 		AttackerState->AddToScore(1.f);
+		VictimState->AddToDefeats(1);
 	}
 	// Elim character
 	if (EliminatedCharacter)
