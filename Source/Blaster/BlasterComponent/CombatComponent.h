@@ -9,6 +9,8 @@
 
 #define TRACE_LENGTH 80000.f
 
+enum class EWeaponType : uint8;
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BLASTER_API UCombatComponent : public UActorComponent
 {
@@ -20,7 +22,6 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void EquipWeapon(class AWeapon* WeaponToEquipped);
-	
 protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool isAiming);
@@ -32,12 +33,17 @@ protected:
 	void Fire();
 	void StartFireTimer();
 	void FireTimerFinished();
+
+	void Reload();
 	
 	UFUNCTION(Server, Reliable)
 	void ServerSetAiming(bool isAiming);
 
 	UFUNCTION(Server, Reliable)
 	void ServerFire(const FVector_NetQuantize& TraceHitTarget);
+
+	UFUNCTION(Server, Reliable)
+	void ServerReload();
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
@@ -57,9 +63,6 @@ private:
 	UPROPERTY(Replicated)
 	bool bIsAiming;
 
-	UFUNCTION()
-	void OnRep_EquippedWeapon();
-
 	UPROPERTY(EditAnywhere)
 	float BaseWalkSpeed;
 
@@ -68,6 +71,16 @@ private:
 
 	bool bFireButtonPressed;
 
+	UPROPERTY(ReplicatedUsing = OnRep_CarriedAmmo);
+	int32 CarriedAmmo;
+
+	UPROPERTY(EditAnywhere)
+	int32 InitialAmmoAmount = 30;
+
+	UFUNCTION()
+	void OnRep_CarriedAmmo();
+
+	TMap<EWeaponType, int32> CarriedAmmoMap;
 	/***
 	 *	HUD and Crosshairs
 	 */
@@ -94,4 +107,9 @@ private:
 	float ZoomInterpSpeed = 20.f;
 
 	void InterpFOV(float DeltaTime);
+	
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
+
+	void InitWeaponAmmo();
 };

@@ -43,6 +43,7 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWeapon, WeaponState);
+	DOREPLIFETIME(AWeapon, Ammo);
 }
 
 void AWeapon::Fire(const FVector& HitTarget)
@@ -68,6 +69,7 @@ void AWeapon::Fire(const FVector& HitTarget)
 			}
 		}
 	}
+	SpendRound();
 }
 
 // 设置武器是否可开火
@@ -130,6 +132,8 @@ void AWeapon::Drop()
 	FDetachmentTransformRules DetachRules(EDetachmentRule::KeepWorld, true);
 	WeaponMesh->DetachFromComponent(DetachRules);
 	SetOwner(nullptr);
+	BlasterOwner = nullptr;
+	BlasterController = nullptr;
 }
 
 void AWeapon::SetWeaponPhysicsAndCollision(bool bEnable)
@@ -177,5 +181,47 @@ void AWeapon::OnRep_WeaponState()
 	case EWeaponState::EWS_Dropped:
 		SetWeaponPhysicsAndCollision(true);
 		break;
+	default:
+		break;
+	}
+}
+
+
+void AWeapon::OnRep_Ammo()
+{
+	// Ammo already updated
+	SetHUDAmmo();
+}
+
+void AWeapon::OnRep_Owner()
+{
+	Super::OnRep_Owner();
+	if (Owner == nullptr)
+	{
+		BlasterOwner = nullptr;
+		BlasterController = nullptr;
+	} else
+	{
+		// now the owner is set, we can get the controller
+		SetHUDAmmo();	
+	}
+}
+
+void AWeapon::SpendRound()
+{
+	Ammo = FMath::Clamp(Ammo-1, 0, MaxCapacity);
+	SetHUDAmmo();
+}
+
+void AWeapon::SetHUDAmmo()
+{
+	BlasterOwner = BlasterOwner == nullptr ? Cast<ABlasterCharacter>(GetOwner()) : BlasterOwner;
+	if (BlasterOwner)
+	{
+		BlasterController = BlasterController == nullptr ? Cast<ABlasterPlayerController>(BlasterOwner->Controller) : BlasterController;
+		if (BlasterController)
+		{
+			BlasterController->SetHUDWeaponAmmo(Ammo);
+		}
 	}
 }

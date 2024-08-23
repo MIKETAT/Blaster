@@ -7,6 +7,10 @@
 #include "GameFramework/Actor.h"
 #include "Weapon.generated.h"
 
+enum class EWeaponType : uint8;
+class ABlasterPlayerController;
+class ABlasterCharacter;
+
 UENUM(BlueprintType)
 enum class EWeaponState : uint8
 {
@@ -32,12 +36,20 @@ public:
 	FORCEINLINE float GetZoomedFOV() const { return ZoomedFOV; }
 	FORCEINLINE float GetZoomInterpSpeed() const { return ZoomInterSpeed; }
 	FORCEINLINE bool CanAutomaticFire() const { return bAutomaticFire; }
-	FORCEINLINE bool CanFire() const { return bCanFire; }	// 这里我把CanFire变量设置为Weapon的成员，感觉更合理
+	FORCEINLINE bool CanFire() const { return bCanFire && Ammo > 0; }	// 这里我把CanFire变量设置为Weapon的成员，感觉更合理
 	FORCEINLINE float GetFireDelay() const { return FireDelay; }
+	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	void SetWeaponFireStatus(bool CanFire);
 	FORCEINLINE FTimerHandle& GetFireTimer() { return FireTimer; }
+	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
 	void Drop();
 	void SetWeaponPhysicsAndCollision(bool bEnable);
+
+	UFUNCTION()
+	void OnRep_Ammo();
+	virtual void OnRep_Owner() override;
+	void SpendRound();
+	void SetHUDAmmo();
 protected:
 	virtual void BeginPlay() override;
 
@@ -100,7 +112,20 @@ private:
 	UPROPERTY(EditAnywhere)
 	float ZoomInterSpeed = 20.f;
 	
-	
+	UPROPERTY(EditAnywhere, ReplicatedUsing= OnRep_Ammo)
+	int32 Ammo = 30;
+
+	UPROPERTY(EditAnywhere)
+	int32 MaxCapacity = 100;
+
+	UPROPERTY()
+	ABlasterCharacter* BlasterOwner;
+
+	UPROPERTY()
+	ABlasterPlayerController* BlasterController;
+
+	UPROPERTY()
+	EWeaponType WeaponType;
 
 // public variables 
 public:

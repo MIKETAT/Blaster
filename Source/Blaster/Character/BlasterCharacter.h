@@ -37,6 +37,7 @@ public:
 	AWeapon* GetEquippedWeapon() const;
 	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; }
 	void PlayFireMontage(bool bAiming);
+	void PlayReloadMontage();
 	void PlayElimMontage();
 	FVector GetHitTarget() const;
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
@@ -81,6 +82,7 @@ protected:
 	void CrouchButtonPressed();
 	void AimButtonPressed();
 	void AimButtonReleased();
+	void ReloadButtomPressed();
 	void CalculateAO_Pitch();
 	void AimOffset(float DeltaTime);
 	void SimProxiesTurn();
@@ -118,7 +120,10 @@ private:
 	
 	UPROPERTY(EditAnywhere)
 	float CameraThreshold = 200.f;
-	
+
+	/**
+	 * Montages
+	 */
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* FireWeaponMontage;
 	
@@ -127,6 +132,10 @@ private:
 	
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* ElimMontage;
+
+	UPROPERTY(EditAnywhere, Category= Combat)
+	UAnimMontage* ReloadMontage;
+	
 
 	bool bRotateRootBone;
 	// 超过这个阈值，在SimProxy执行turn animation

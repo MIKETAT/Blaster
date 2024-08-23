@@ -7,6 +7,7 @@
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/PlayerController/BlasterPlayerController.h"
 #include "Blaster/Weapon/Weapon.h"
+#include "Blaster/Weapon/WeaponTypes.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -26,6 +27,8 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCombatComponent, EquippedWeapon);
 	DOREPLIFETIME(UCombatComponent, bIsAiming);
+	DOREPLIFETIME_CONDITION(UCombatComponent, CarriedAmmo, COND_OwnerOnly);	//只需要复制给持有者即可，无需复制给其他玩家，节省带宽
+	// todo condition用法详解
 }
 
 void UCombatComponent::BeginPlay()
@@ -39,6 +42,10 @@ void UCombatComponent::BeginPlay()
 			DefaultFOV = Character->GetFollowCamera()->FieldOfView;
 			CurrentFOV = DefaultFOV;
 		}
+	}
+	if (Character->HasAuthority())
+	{
+		InitWeaponAmmo();
 	}
 }
 
@@ -101,6 +108,11 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 	}
 }
 
+void UCombatComponent::OnRep_CarriedAmmo()
+{
+	
+}
+
 /**
  *	Fire Section
  */
@@ -117,6 +129,7 @@ void UCombatComponent::FireButtonPressed(bool bPressed)
 void UCombatComponent::Fire()
 {
 	if (EquippedWeapon == nullptr || EquippedWeapon->CanFire() == false)	return;
+	// todo 设置逻辑，子弹数为0时开火发出卡壳的声音
 	EquippedWeapon->SetWeaponFireStatus(false);	// 开火执行时不能同时开火
 	ServerFire(HitTarget);
 	CrosshairShootingFactor = FMath::Max(CrosshairShootingFactor + 0.2f, 1.f);
@@ -144,6 +157,20 @@ void UCombatComponent::FireTimerFinished()
 	}
 }
 
+void UCombatComponent::Reload()
+{
+	if (CarriedAmmo > 0)
+	{
+		ServerReload();
+	}
+}
+
+void UCombatComponent::ServerReload_Implementation()
+{
+	if (Character == nullptr)	return;
+	Character->PlayReloadMontage();
+}
+
 void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
 	MulticastFire(TraceHitTarget);
@@ -158,6 +185,8 @@ void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& T
 		EquippedWeapon->Fire(TraceHitTarget);
 	}
 }
+
+
 /**
  * Aiming Section
  */
@@ -260,18 +289,42 @@ void UCombatComponent::OnRep_EquippedWeapon()
 		
 		Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
 		Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
+
+		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
+		if (Controller)
+		{
+			Controller->SetHUDCarriedAmmo(CarriedAmmo);
+		}
 	}
 }
 
+void UCombatComponent::InitWeaponAmmo()
+{
+	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRifle, InitialAmmoAmount);
+}
+
+// only on server
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 {
 	if (!Character || !WeaponToEquipped)	return;
-	// 假设已经有武器，不捡起(暂定，后续可改为更换武器)
-	if (Character->isWeaponEquipped())		return;
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->Drop();	// 已有武器则扔掉替换
+	}
 	
 	EquippedWeapon = WeaponToEquipped;
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+	}
+	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
+	if (Controller)
+	{
+		Controller->SetHUDCarriedAmmo(CarriedAmmo);
+	}
+	
 	// todo 为什么这里不在client执行AttachActor，client照样能完成捡起武器
 	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
 	if (HandSocket)
@@ -280,6 +333,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 	}
 	EquippedWeapon->SetOwner(Character);
 	EquippedWeapon->ShowPickupWidget(false);
+	EquippedWeapon->SetHUDAmmo();
 	
 	
 	Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向

@@ -13,6 +13,7 @@
 
 #include "Blaster/Blaster.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Blaster/Weapon/WeaponTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystemComponent.h"
 
@@ -61,7 +62,10 @@ ABlasterCharacter::ABlasterCharacter()
 void ABlasterCharacter::Destroyed()
 {
 	Super::Destroyed();
-	ElimBotComponent->DestroyComponent();
+	if (ElimBotComponent)
+	{
+		ElimBotComponent->DestroyComponent();	
+	}
 }
 
 void ABlasterCharacter::Tick(float DeltaTime)
@@ -105,8 +109,6 @@ void ABlasterCharacter::PostInitializeComponents()
 	}
 }
 
-
-
 void ABlasterCharacter::SetOverlappingWeapon(AWeapon* OverlapWeapon)
 {
 if (OverlappingWeapon)
@@ -148,6 +150,25 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 	{
 		AnimInstance->Montage_Play(FireWeaponMontage);
 		FName SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
+void ABlasterCharacter::PlayReloadMontage()
+{
+	if (!Combat || !Combat->EquippedWeapon)	return;
+	//PlayAnimMontage(FireWeaponMontage);
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ReloadMontage)
+	{
+		AnimInstance->Montage_Play(ReloadMontage);
+		FName SectionName;
+		switch (Combat->EquippedWeapon->GetWeaponType())
+		{
+			case EWeaponType::EWT_AssaultRifle:
+				SectionName = FName("Rifle");
+				break;
+		}
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
@@ -216,6 +237,10 @@ void ABlasterCharacter::PollInit()
 
 void ABlasterCharacter::MulticastElim_Implementation()
 {
+	if (BlasterPlayerController)
+	{
+		BlasterPlayerController->SetHUDWeaponAmmo(0);
+	}
 	bElimmed = true;
 	PlayElimMontage();
 	
@@ -323,7 +348,7 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction(TEXT("Aim"), IE_Released, this, &ABlasterCharacter::AimButtonReleased);
 	PlayerInputComponent->BindAction(TEXT("Fire"), IE_Pressed, this, &ABlasterCharacter::FireButtonPressed);
 	PlayerInputComponent->BindAction(TEXT("Fire"), IE_Released, this, &ABlasterCharacter::FireButtonReleased);
-	
+	PlayerInputComponent->BindAction(TEXT("Reload"), IE_Pressed, this, &ABlasterCharacter::ReloadButtomPressed);
 	
 	PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &ABlasterCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &ABlasterCharacter::MoveRight);
@@ -404,6 +429,14 @@ void ABlasterCharacter::AimButtonReleased()
 	{
 		Combat->SetAiming(false);
 	}
+}
+
+void ABlasterCharacter::ReloadButtomPressed()
+{
+	if (Combat)
+	{
+		Combat->Reload();
+	}	
 }
 
 void ABlasterCharacter::CalculateAO_Pitch()
