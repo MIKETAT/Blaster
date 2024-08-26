@@ -13,6 +13,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Sound/SoundCue.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -27,6 +28,7 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCombatComponent, EquippedWeapon);
 	DOREPLIFETIME(UCombatComponent, bIsAiming);
+	DOREPLIFETIME(UCombatComponent, CombatState);
 	DOREPLIFETIME_CONDITION(UCombatComponent, CarriedAmmo, COND_OwnerOnly);	//只需要复制给持有者即可，无需复制给其他玩家，节省带宽
 	// todo condition用法详解
 }
@@ -110,7 +112,29 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 
 void UCombatComponent::OnRep_CarriedAmmo()
 {
-	
+	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
+	if (Controller)
+	{
+		Controller->SetHUDCarriedAmmo(CarriedAmmo);
+	}
+}
+
+// on client
+void UCombatComponent::OnRep_CombatState()
+{
+	switch (CombatState)
+	{
+		case ECombatState::ECS_UnOccupied:
+			// 切回到UnOccupied，此时开火键按住的话就开火
+			if (bFireButtonPressed)
+			{
+				Fire();
+			}
+			break;
+		case ECombatState::ECS_Reloading:
+			HandleReload();
+			break;
+	}
 }
 
 /**
@@ -128,7 +152,8 @@ void UCombatComponent::FireButtonPressed(bool bPressed)
 
 void UCombatComponent::Fire()
 {
-	if (EquippedWeapon == nullptr || EquippedWeapon->CanFire() == false)	return;
+	// 无武器 || 武器无法开火(此刻不能开火/没子弹) || 当前状态不能开火
+	if (EquippedWeapon == nullptr || !EquippedWeapon->CanFire() || CombatState != ECombatState::ECS_UnOccupied)	return;
 	// todo 设置逻辑，子弹数为0时开火发出卡壳的声音
 	EquippedWeapon->SetWeaponFireStatus(false);	// 开火执行时不能同时开火
 	ServerFire(HitTarget);
@@ -155,11 +180,53 @@ void UCombatComponent::FireTimerFinished()
 	{
 		Fire();
 	}
+	if (EquippedWeapon->IsEmpty())
+	{
+		Reload();
+	}
+}
+
+// todo reload的动画需要改，只上半身reload，不影响下半身，不会改变状态(蹲下->站起)这种
+void UCombatComponent::HandleReload()
+{
+	CombatState = ECombatState::ECS_Reloading;
+	Character->PlayReloadMontage();
+}
+
+// on server
+void UCombatComponent::UpdateCarriedAmmo()
+{
+	if (Character == nullptr || EquippedWeapon == nullptr)	return;
+	int32 ReloadAmount = AmountToReload();
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] -= ReloadAmount;
+		CarriedAmmo -= ReloadAmount;
+		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
+		if (Controller)
+		{
+			Controller->SetHUDCarriedAmmo(CarriedAmmo);
+		}
+		EquippedWeapon->AddAmmo(ReloadAmount);
+	}
+}
+
+int32 UCombatComponent::AmountToReload()
+{
+	if (Character == nullptr || EquippedWeapon == nullptr)	return 0;
+	int32 RoomForReload = EquippedWeapon->GetMaxCapacity() - EquippedWeapon->GetAmmo();
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		int32 CarriedWeaponAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+		int32 Least = FMath::Min(CarriedWeaponAmmo, RoomForReload);
+		return FMath::Clamp(RoomForReload, 0, Least);	
+	}
+	return 0;
 }
 
 void UCombatComponent::Reload()
 {
-	if (CarriedAmmo > 0)
+	if (CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading)
 	{
 		ServerReload();
 	}
@@ -167,8 +234,8 @@ void UCombatComponent::Reload()
 
 void UCombatComponent::ServerReload_Implementation()
 {
-	if (Character == nullptr)	return;
-	Character->PlayReloadMontage();
+	if (Character == nullptr || EquippedWeapon == nullptr)	return;
+	HandleReload();
 }
 
 void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
@@ -179,7 +246,7 @@ void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& Trac
 void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
 	if (EquippedWeapon == nullptr)	return;
-	if (Character)
+	if (Character && CombatState == ECombatState::ECS_UnOccupied)
 	{
 		Character->PlayFireMontage(bIsAiming);
 		EquippedWeapon->Fire(TraceHitTarget);
@@ -216,12 +283,17 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		Start += CrosshairWorldDirection * CameraDistance;
 		
 		FVector End = Start + CrosshairWorldDirection * TRACE_LENGTH;
-		GetWorld()->LineTraceSingleByChannel(
+		bool isHit = GetWorld()->LineTraceSingleByChannel(
 			TraceHitResult,
 			Start,
 			End,
 			ECC_Visibility);
-
+		// todo 想想这里未击中的话如何处理，让人物持枪动画正常
+		// 未击中，设置HitResult的ImpactPoint
+		if (!isHit)
+		{
+			TraceHitResult.ImpactPoint = End;
+		}
 		if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairsInterface>() && TraceHitResult.GetActor() != this->Character)
 		{
 			DrawDebugPoint(GetWorld(), TraceHitResult.ImpactPoint, 5.f, FColor::Orange);
@@ -295,6 +367,15 @@ void UCombatComponent::OnRep_EquippedWeapon()
 		{
 			Controller->SetHUDCarriedAmmo(CarriedAmmo);
 		}
+		
+		if (EquippedWeapon->EquipSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(
+				this,
+				EquippedWeapon->EquipSound,
+				EquippedWeapon->GetActorLocation()
+			);
+		}
 	}
 }
 
@@ -334,8 +415,36 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 	EquippedWeapon->SetOwner(Character);
 	EquippedWeapon->ShowPickupWidget(false);
 	EquippedWeapon->SetHUDAmmo();
+	if (EquippedWeapon->EquipSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			EquippedWeapon->EquipSound,
+			EquippedWeapon->GetActorLocation()
+		);
+	}
 	
+	if (EquippedWeapon->IsEmpty())
+	{
+		Reload();
+	}
 	
 	Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
 	Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
+}
+
+void UCombatComponent::FinishReloading()
+{
+	if (Character == nullptr)	return;
+	// 重要变量的变化，例如状态的变化都在server执行
+	if (Character->HasAuthority())
+	{
+		CombatState = ECombatState::ECS_UnOccupied;
+		UpdateCarriedAmmo();
+	}
+	// 换弹完成，仍按住了开火
+	if (bFireButtonPressed)
+	{
+		Fire();
+	}
 }

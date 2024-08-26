@@ -8,6 +8,41 @@
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
 
+ABlasterGameMode::ABlasterGameMode()
+{
+	bDelayedStart = true;	// 会停在WaitingToStart阶段等待 StartMatch进入InProgress阶段
+}
+
+void ABlasterGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+	LevelStartTime = GetWorld()->GetTimeSeconds();
+}
+
+void ABlasterGameMode::OnMatchStateSet()
+{
+	Super::OnMatchStateSet();
+	for (FConstPlayerControllerIterator it = GetWorld()->GetPlayerControllerIterator(); it; it++)
+	{
+		ABlasterPlayerController* PlayerController = Cast<ABlasterPlayerController>(*it);
+		PlayerController->SetMatchState(MatchState);
+	}
+}
+
+
+void ABlasterGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (MatchState == MatchState::WaitingToStart)
+	{
+		CountDownTime = WarmupTime + LevelStartTime - GetWorld()->GetTimeSeconds();
+		if (CountDownTime < 0.f)
+		{
+			StartMatch();
+		}
+	}
+}
+
 void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
                                         ABlasterPlayerController* VictimController, ABlasterPlayerController* AttackerController)
 {
@@ -41,3 +76,4 @@ void ABlasterGameMode::RequestRespawn(ACharacter* ElimmedCharacter, AController*
 		RestartPlayerAtPlayerStart(ElimmedController, PlayerStarts[Selection]);
 	}
 }
+

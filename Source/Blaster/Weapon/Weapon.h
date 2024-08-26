@@ -39,6 +39,8 @@ public:
 	FORCEINLINE bool CanFire() const { return bCanFire && Ammo > 0; }	// 这里我把CanFire变量设置为Weapon的成员，感觉更合理
 	FORCEINLINE float GetFireDelay() const { return FireDelay; }
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
+	FORCEINLINE bool IsEmpty() const { return Ammo == 0; }
+	FORCEINLINE int32 GetMaxCapacity() const { return MaxCapacity; }
 	void SetWeaponFireStatus(bool CanFire);
 	FORCEINLINE FTimerHandle& GetFireTimer() { return FireTimer; }
 	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
@@ -50,6 +52,7 @@ public:
 	virtual void OnRep_Owner() override;
 	void SpendRound();
 	void SetHUDAmmo();
+	void AddAmmo(int AmmoAmount);
 protected:
 	virtual void BeginPlay() override;
 
@@ -116,7 +119,7 @@ private:
 	int32 Ammo = 30;
 
 	UPROPERTY(EditAnywhere)
-	int32 MaxCapacity = 100;
+	int32 MaxCapacity = 30;
 
 	UPROPERTY()
 	ABlasterCharacter* BlasterOwner;
@@ -146,5 +149,7 @@ public:
 	
 	UPROPERTY(EditAnywhere, Category = "Crosshairs")
 	UTexture2D* CrosshairBottom;
-	
+
+	UPROPERTY(EditAnywhere)
+	USoundCue* EquipSound;
 };

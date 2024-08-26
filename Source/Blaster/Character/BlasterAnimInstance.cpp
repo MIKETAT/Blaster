@@ -5,6 +5,7 @@
 
 #include "AssetTypeCategories.h"
 #include "BlasterCharacter.h"
+#include "Blaster/BlasterTypes/CombatState.h"
 #include "Blaster/Weapon/Weapon.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -40,6 +41,9 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsCrouched = BlasterCharacter->bIsCrouched;
 	bIsAiming = BlasterCharacter->isAiming();
 	bElimmed = BlasterCharacter->IsElimmed();
+	bUseFABRIK = BlasterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bUseAimOffsets = BlasterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bUseTransformRightHand = BlasterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
 	TurningInPlace = BlasterCharacter->GetTurningInPlace();
 
 	// GlobalRotation 是controller相对世界的rotation

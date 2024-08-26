@@ -3,12 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blaster/BlasterTypes/CombatState.h"
 #include "Components/ActorComponent.h"
 #include "Blaster/HUD/BlasterHUD.h"
 #include "CombatComponent.generated.h"
 
 #define TRACE_LENGTH 80000.f
 
+enum class ECombatState : uint8;
 enum class EWeaponType : uint8;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -22,6 +24,9 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void EquipWeapon(class AWeapon* WeaponToEquipped);
+	
+	UFUNCTION(BlueprintCallable)
+	void FinishReloading();
 protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool isAiming);
@@ -77,8 +82,14 @@ private:
 	UPROPERTY(EditAnywhere)
 	int32 InitialAmmoAmount = 30;
 
+	UPROPERTY(ReplicatedUsing=OnRep_CombatState)
+	ECombatState CombatState = ECombatState::ECS_UnOccupied;
+	
 	UFUNCTION()
 	void OnRep_CarriedAmmo();
+
+	UFUNCTION()
+	void OnRep_CombatState();
 
 	TMap<EWeaponType, int32> CarriedAmmoMap;
 	/***
@@ -112,4 +123,8 @@ private:
 	void OnRep_EquippedWeapon();
 
 	void InitWeaponAmmo();
+
+	void HandleReload();
+	void UpdateCarriedAmmo();
+	int32 AmountToReload();
 };

@@ -7,7 +7,6 @@
 
 void UOverheadWidget::SetDisplayText(FString TextToDisplay)
 {
-	UE_LOG(LogTemp, Error, TEXT("exec SetDisplayText"));
 	if (DisplayText)
 	{
 		UE_LOG(LogTemp, Error, TEXT("set Text %s"), *TextToDisplay);

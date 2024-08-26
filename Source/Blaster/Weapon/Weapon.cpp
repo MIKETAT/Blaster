@@ -225,3 +225,9 @@ void AWeapon::SetHUDAmmo()
 		}
 	}
 }
+
+void AWeapon::AddAmmo(int AmmoAmount)
+{
+	Ammo = FMath::Clamp(Ammo + AmmoAmount, 0, MaxCapacity);
+	SetHUDAmmo();
+}

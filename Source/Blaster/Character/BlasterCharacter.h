@@ -11,6 +11,7 @@
 #include "GameFramework/Character.h"
 #include "BlasterCharacter.generated.h"
 
+enum class ECombatState : uint8;
 class UTimelineComponent;
 class ABlasterGameMode;
 class UCameraComponent;
@@ -58,7 +59,7 @@ public:
 	FORCEINLINE bool IsElimmed() const { return bElimmed; }
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
-	
+	ECombatState GetCombatState() const;
 	float CalculateSpeed();
 	void UpdateHealthHUD();
 	
@@ -108,7 +109,7 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_OverlappingWeapon)
 	class AWeapon* OverlappingWeapon;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "ttrue"))
 	class UCombatComponent* Combat;
 
 	float AO_Yaw;

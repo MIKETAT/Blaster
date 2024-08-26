@@ -189,6 +189,12 @@ FVector ABlasterCharacter::GetHitTarget() const
 	return Combat->HitTarget;
 }
 
+ECombatState ABlasterCharacter::GetCombatState() const
+{
+	if (Combat == nullptr)	return ECombatState::ECS_UnOccupied;
+	return Combat->CombatState;
+}
+
 float ABlasterCharacter::CalculateSpeed()
 {
 	FVector Velocity = GetVelocity();
@@ -504,7 +510,6 @@ void ABlasterCharacter::SimProxiesTurn()
 	if (Speed > 0.f)
 	{
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;	// Runing 不需要转身动画
-		UE_LOG(LogTemp, Error, TEXT("I am Runing, I dont't need turning"));
 		return;;
 	}
 	

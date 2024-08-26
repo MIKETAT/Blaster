@@ -3,23 +3,47 @@
 
 #include "BlasterHUD.h"
 
+#include "Announcement.h"
 #include "CharacterOverlay.h"
 #include "Blueprint/UserWidget.h"
 
 void ABlasterHUD::BeginPlay()
 {
 	Super::BeginPlay();
-	AddCharacterOverlay();
-}
-
-void ABlasterHUD::AddCharacterOverlay()
-{
 	APlayerController* PlayerController = GetOwningPlayerController();
-	if (PlayerController && CharacterOverlayClass)
+	if (PlayerController == nullptr)	return;
+	if (CharacterOverlayClass)
 	{
 		CharacterOverlay = CreateWidget<UCharacterOverlay>(PlayerController, CharacterOverlayClass);
-		CharacterOverlay->AddToViewport();
 	}
+	if (AnnouncementClass)
+	{
+		Announcement = CreateWidget<UAnnouncement>(PlayerController, AnnouncementClass);
+	}
+}
+
+// todo 变量初始化时机，有更合适的实现吗
+void ABlasterHUD::AddCharacterOverlay()
+{
+	if (CharacterOverlay)
+	{
+		CharacterOverlay->AddToViewport();	
+	}
+	/*if (CharacterOverlay == nullptr && CharacterOverlayClass)
+	{
+		CharacterOverlay = CreateWidget<UCharacterOverlay>(PlayerController, CharacterOverlayClass);
+		
+	}*/
+}
+
+bool ABlasterHUD::AddAnnouncement()
+{
+	if (Announcement)
+	{
+		Announcement->AddToViewport();
+		return true;
+	}
+	return false;
 }
 
 void ABlasterHUD::DrawHUD()
