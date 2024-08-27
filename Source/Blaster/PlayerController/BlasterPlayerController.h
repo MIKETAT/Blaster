@@ -23,11 +23,14 @@ public:
 	void SetHUDDefeats(int32 Defeats);
 	void SetHUDWeaponAmmo(int32 Ammo);
 	void SetHUDCarriedAmmo(int32 Ammo);
-	void SetHUDCountDown(int32 CountDown);
+	void SetHUDCountDown(float CountDown);
 	void SetHUDTime();
+	void SetHUDAnnouncementCountDown(float CountDown);
 	virtual void OnPossess(APawn* InPawn) override;
 	void HandleMatchStart();
+	void HandleMatchCoolDown();
 	void SetMatchState(FName State);
+	FString GetCurrentTopPlayerInfo();
 	void PollInit();
 	// Client -> Server
 	UFUNCTION(Server, Reliable)
@@ -37,20 +40,32 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ReportServerTime(float ClientRequestTime, float ServerReceivedRequestTime);
 
+	// todo 倒计时不准的问题，为什么都是在server端的调用  网络游戏的调试问题
+	UFUNCTION(Server, Reliable)
+	void ServerCheckMatchState();
+
+	UFUNCTION(Client, Reliable)
+	void ClientJoinGame(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime);
+
 	virtual float GetServerTime();	// synced with server clock
+
 protected:
 	virtual void BeginPlay() override;
 private:
 	UPROPERTY()
 	class ABlasterHUD* BlasterHUD;
 
-	float MatchTime = 120.f;
 	int32 CountDownTime = 0;
 
 	UPROPERTY(EditAnywhere)
 	float SyncFrequency = 5.f;			// sync 间隔
 	float TimeSyncDuration = 0.f;		// 距离上次sync的间隔时间 
 	float ServerClientDelta = 0.f;		// server client 相差时间
+
+	float LevelStartTime = 0.f;
+	float MatchTime = 0.f;
+	float WarmupTime = 0.f;
+	float CoolDownTime = 0.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_MatchState)
 	FName MatchState;

@@ -11,6 +11,7 @@
 #include "GameFramework/Character.h"
 #include "BlasterCharacter.generated.h"
 
+class ABlasterPlayerState;
 enum class ECombatState : uint8;
 class UTimelineComponent;
 class ABlasterGameMode;
@@ -59,6 +60,7 @@ public:
 	FORCEINLINE bool IsElimmed() const { return bElimmed; }
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
+	FORCEINLINE ABlasterPlayerState* GetBlasterPlayerState() const { return BlasterPlayerState; }
 	ECombatState GetCombatState() const;
 	float CalculateSpeed();
 	void UpdateHealthHUD();
