@@ -40,4 +40,10 @@ protected:
 	virtual void HandleMatchCoolDown();
 private:
 	float CountDownTime;
+
+	UPROPERTY(EditAnywhere)
+	USoundCue* LobbyMusic;
+
+	UPROPERTY()
+	UAudioComponent* LobbyMusicComp;
 };

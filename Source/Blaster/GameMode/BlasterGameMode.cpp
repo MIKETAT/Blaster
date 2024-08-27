@@ -6,8 +6,10 @@
 #include "Blaster/BlasterGameState.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Components/AudioComponent.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundCue.h"
 
 namespace MatchState
 {
@@ -31,6 +33,18 @@ void ABlasterGameMode::OnMatchStateSet()
 	if (MatchState == MatchState::CoolDown)
 	{
 		
+	} else if (MatchState == MatchState::WaitingToStart)
+	{
+		if (LobbyMusic)
+		{
+			LobbyMusicComp = UGameplayStatics::SpawnSound2D(this, LobbyMusic);	
+		}
+	} else if (MatchState == MatchState::InProgress)
+	{
+		if (LobbyMusicComp)
+		{
+			LobbyMusicComp->Stop();
+		}
 	}
 	for (FConstPlayerControllerIterator it = GetWorld()->GetPlayerControllerIterator(); it; it++)
 	{

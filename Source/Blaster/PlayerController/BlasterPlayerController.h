@@ -27,6 +27,7 @@ public:
 	void SetHUDTime();
 	void SetHUDAnnouncementCountDown(float CountDown);
 	virtual void OnPossess(APawn* InPawn) override;
+	void HandleMatchWaitToStart();
 	void HandleMatchStart();
 	void HandleMatchCoolDown();
 	void SetMatchState(FName State);

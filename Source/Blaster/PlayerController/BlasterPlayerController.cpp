@@ -255,6 +255,16 @@ void ABlasterPlayerController::OnPossess(APawn* InPawn)
 	}
 }
 
+void ABlasterPlayerController::HandleMatchWaitToStart()
+{
+	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
+	if (BlasterHUD)
+	{
+		BlasterHUD->AddAnnouncement();
+	}
+	//UGameplayStatics::SpawnSound2D(this)
+}
+
 void ABlasterPlayerController::HandleMatchStart()
 {
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
@@ -296,10 +306,7 @@ void ABlasterPlayerController::SetMatchState(FName State)
 	
 	if (MatchState == MatchState::WaitingToStart)
 	{
-		if (BlasterHUD)
-		{
-			BlasterHUD->AddAnnouncement();
-		}
+		HandleMatchWaitToStart();
 	}
 	else if (MatchState == MatchState::InProgress)
 	{
@@ -363,14 +370,7 @@ void ABlasterPlayerController::OnRep_MatchState()
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	if (MatchState == MatchState::WaitingToStart)
 	{
-		UE_LOG(LogTemp, Error, TEXT("OnRep_MatchState, state == waittostart"));
-		if (BlasterHUD)
-		{
-			BlasterHUD->AddAnnouncement();
-		} else
-		{
-			UE_LOG(LogTemp, Error, TEXT("OnRep_MatchState, BlasterHUD is null"));
-		}
+		HandleMatchWaitToStart();
 	}
 	else if (MatchState == MatchState::InProgress)
 	{
