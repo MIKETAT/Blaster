@@ -41,8 +41,6 @@ ABlasterCharacter::ABlasterCharacter()
 	Combat->SetIsReplicated(true);
 
 	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
-	// tood 在哪可以set
-	GetMovementComponent()->NavAgentProps.bCanCrouch = true;
 
 	// Camera Collision
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
@@ -68,6 +66,26 @@ void ABlasterCharacter::Destroyed()
 	}
 }
 
+
+void ABlasterCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	// tood 在哪可以set
+	GetMovementComponent()->NavAgentProps.bCanCrouch = true;
+
+	// init
+	Health = MaxHealth;
+	
+	if (Combat == nullptr)
+	{
+		Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+	}
+	UpdateHealthHUD();
+	if (HasAuthority())
+	{
+		OnTakeAnyDamage.AddDynamic(this, &ABlasterCharacter::ReceiveDamage);
+	}
+}
 void ABlasterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -329,19 +347,6 @@ void ABlasterCharacter::ElimTimerFinish()
 	}
 }
 
-void ABlasterCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-	if (Combat == nullptr)
-	{
-		Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
-	}
-	UpdateHealthHUD();
-	if (HasAuthority())
-	{
-		OnTakeAnyDamage.AddDynamic(this, &ABlasterCharacter::ReceiveDamage);
-	}
-}
 
 void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {

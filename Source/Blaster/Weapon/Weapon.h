@@ -74,7 +74,7 @@ protected:
 		int32 OtherIndex
 	);
 
-private:
+protected:
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	USkeletalMeshComponent* WeaponMesh;
 
@@ -127,7 +127,7 @@ private:
 	UPROPERTY()
 	ABlasterPlayerController* BlasterController;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	EWeaponType WeaponType;
 
 // public variables 

@@ -152,11 +152,11 @@ private:
 	 * Player Health
 	 */
 	UPROPERTY(EditAnywhere, Category = "Player Status")
-	float MaxHealth = 100.f;
+	float MaxHealth = 100;
 
 	// Heath不放在 PlayerStats是因为其更新频率不够
 	UPROPERTY(ReplicatedUsing= OnRep_Health, VisibleAnywhere, Category = "Player Status")
-	float Health = 100.f;
+	float Health = MaxHealth;
 
 	bool bElimmed = false;
 

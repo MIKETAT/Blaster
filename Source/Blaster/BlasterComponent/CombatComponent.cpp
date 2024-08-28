@@ -379,9 +379,12 @@ void UCombatComponent::OnRep_EquippedWeapon()
 	}
 }
 
+// todo 是否要设置初始自身携带弹药
+// todo 是否可以根据enum WeaponType 遍历这些类，得到每种武器的最大弹容量，作为初始值初始化
 void UCombatComponent::InitWeaponAmmo()
 {
 	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRifle, InitialAmmoAmount);
+	
 }
 
 // only on server

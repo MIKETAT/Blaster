@@ -18,7 +18,6 @@ public:
 protected:
 	// override onHit
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpluse, const FHitResult& Hit) override;
-	
 private:
 	
 };
