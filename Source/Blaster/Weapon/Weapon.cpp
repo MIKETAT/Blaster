@@ -14,6 +14,7 @@ AWeapon::AWeapon()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
+	SetReplicateMovement(true);
 
 	WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	WeaponMesh->SetupAttachment(RootComponent);
@@ -32,6 +33,22 @@ AWeapon::AWeapon()
 	PickUpWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("PickUpWidget"));
 	PickUpWidget->SetupAttachment(RootComponent);
 	WeaponState = EWeaponState::EWS_Initial;
+}
+
+void AWeapon::BeginPlay()
+{
+	Super::BeginPlay();
+	if (PickUpWidget)
+	{
+		PickUpWidget->SetVisibility(false);
+	}
+	if (HasAuthority())
+	{
+		AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		AreaSphere->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+		AreaSphere->OnComponentBeginOverlap.AddDynamic(this, &AWeapon::OnSphereOverlap);
+		AreaSphere->OnComponentEndOverlap.AddDynamic(this, &AWeapon::OnSphereEndOverlap);
+	}
 }
 
 void AWeapon::Tick(float DeltaTime)
@@ -58,7 +75,6 @@ void AWeapon::Fire(const FVector& HitTarget)
 		if (AmmoEjectSocket)
 		{
 			FTransform SocketTransform = AmmoEjectSocket->GetSocketTransform(WeaponMesh);
-			FActorSpawnParameters SpawnParameters;
 			UWorld* World = GetWorld();
 			if (World)
 			{
@@ -76,23 +92,6 @@ void AWeapon::Fire(const FVector& HitTarget)
 void AWeapon::SetWeaponFireStatus(bool CanFire)
 {
 	bCanFire = CanFire;
-}
-
-
-void AWeapon::BeginPlay()
-{
-	Super::BeginPlay();
-	if (PickUpWidget)
-	{
-		PickUpWidget->SetVisibility(false);
-	}
-	if (HasAuthority())
-	{
-		AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		AreaSphere->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
-		AreaSphere->OnComponentBeginOverlap.AddDynamic(this, &AWeapon::OnSphereOverlap);
-		AreaSphere->OnComponentEndOverlap.AddDynamic(this, &AWeapon::OnSphereEndOverlap);
-	}
 }
 
 void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlapComponent, AActor* OtherActor,

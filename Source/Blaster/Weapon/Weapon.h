@@ -74,7 +74,6 @@ protected:
 		int32 OtherIndex
 	);
 
-protected:
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	USkeletalMeshComponent* WeaponMesh;
 

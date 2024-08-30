@@ -70,6 +70,11 @@ void ABlasterPlayerController::BeginPlay()
 	ServerCheckMatchState();
 }
 
+ABlasterPlayerController::ABlasterPlayerController()
+{
+	//PlayerCameraManager->Set
+}
+
 void ABlasterPlayerController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);

@@ -36,6 +36,7 @@ ABlasterCharacter::ABlasterCharacter()
 	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
 	OverheadWidget->SetupAttachment(RootComponent);
 	OverheadWidget->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	OverheadWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	Combat->SetIsReplicated(true);
@@ -186,6 +187,9 @@ void ABlasterCharacter::PlayReloadMontage()
 			case EWeaponType::EWT_AssaultRifle:
 				SectionName = FName("Rifle");
 				break;
+		case EWeaponType::EWT_RocketLauncher:
+				SectionName = FName("Rifle");	// 
+			break;
 		}
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
@@ -223,6 +227,7 @@ float ABlasterCharacter::CalculateSpeed()
 void ABlasterCharacter::UpdateHealthHUD()
 {
 	BlasterPlayerController = GetBlasterPlayerController();
+	
 	if (BlasterPlayerController)
 	{
 		BlasterPlayerController->SetHUDHealth(Health, MaxHealth);
@@ -461,6 +466,7 @@ void ABlasterCharacter::CalculateAO_Pitch()
 		// serilized -> compressed -> sent to network -> decompressed to [0, 360) range
 		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
 	}
+	UE_LOG(LogTemp, Error, TEXT("Pitch = %f"), AO_Pitch);
 }
 
 /**

@@ -59,6 +59,11 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 		FHitResult HitResult;
 		TraceUnderCrosshairs(HitResult);
 		HitTarget = HitResult.ImpactPoint;
+		DrawDebugPoint(
+			GetWorld(),
+			HitTarget,
+			15.f,
+			FColor::Purple);
 		InterpFOV(DeltaTime);
 		SetHUDCrosshairs(DeltaTime);
 	}
@@ -283,11 +288,17 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		Start += CrosshairWorldDirection * CameraDistance;
 		
 		FVector End = Start + CrosshairWorldDirection * TRACE_LENGTH;
+		FCollisionQueryParams Params;
+		FCollisionQueryParams QueryParams;
+		QueryParams.AddIgnoredActor(GetOwner());
+		// todo 这里射线检测添加了IgnoreActor, 但是Pitch过大会使动画不正确，考虑限制contorller的rotation
 		bool isHit = GetWorld()->LineTraceSingleByChannel(
 			TraceHitResult,
 			Start,
 			End,
-			ECC_Visibility);
+			ECC_Visibility,
+			QueryParams
+			);
 		// todo 想想这里未击中的话如何处理，让人物持枪动画正常
 		// 未击中，设置HitResult的ImpactPoint
 		if (!isHit)
@@ -303,9 +314,6 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		{
 			HUDPackage.CrosshairsColor = FLinearColor::White;
 		}
-	} else
-	{
-		UE_LOG(LogTemp, Error, TEXT("bScreenToWorld fasle"));
 	}
 }
 
