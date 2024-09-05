@@ -21,6 +21,7 @@ UCombatComponent::UCombatComponent()
 
 	BaseWalkSpeed = 600.f;
 	AimWalkSpeed = 400.f;
+
 }
 
 void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -319,11 +320,14 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 
 void UCombatComponent::SetAiming(bool isAiming)
 {
+	if (Character == nullptr || EquippedWeapon == nullptr)		return;
 	bIsAiming = isAiming;	// set before rpc and replicated
 	ServerSetAiming(bIsAiming);
-	if (Character)
+	Character->GetCharacterMovement()->MaxWalkSpeed = bIsAiming ? AimWalkSpeed : BaseWalkSpeed;
+	if (Character->IsLocallyControlled() && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle)
 	{
-		Character->GetCharacterMovement()->MaxWalkSpeed = bIsAiming ? AimWalkSpeed : BaseWalkSpeed;
+		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
+		Controller->SetHUDSniperScope(bIsAiming);
 	}
 }
 
@@ -357,6 +361,8 @@ void UCombatComponent::InterpFOV(float DeltaTime)
  */
 void UCombatComponent::OnRep_EquippedWeapon()
 {
+	UE_LOG(LogTemp, Error, TEXT("OnRep_EquippedWeapon"));
+	UE_LOG(LogTemp, Error, TEXT("EquippedWeapon Changed"));
 	if (Character && EquippedWeapon)
 	{
 		// TODO 为什么下面这段不加上，client依然可以执行捡起武器。
@@ -398,12 +404,15 @@ void UCombatComponent::InitWeaponAmmo()
 // only on server
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 {
-	if (!Character || !WeaponToEquipped)	return;
+	if (!Character || !WeaponToEquipped)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Character or WeaponToEquipped is null, return"));
+		return;
+	}
 	if (EquippedWeapon)
 	{
 		EquippedWeapon->Drop();	// 已有武器则扔掉替换
 	}
-	
 	EquippedWeapon = WeaponToEquipped;
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 
@@ -411,6 +420,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 	{
 		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
 	}
+	
 	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
 	if (Controller)
 	{

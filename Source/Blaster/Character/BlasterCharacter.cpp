@@ -20,6 +20,7 @@
 ABlasterCharacter::ABlasterCharacter()
 {
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	bReplicates = true;
 	PrimaryActorTick.bCanEverTick = true;
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CamreaBoom"));
 	CameraBoom->SetupAttachment(GetMesh());
@@ -110,6 +111,8 @@ void ABlasterCharacter::Tick(float DeltaTime)
 	}
 	// initialization
 	PollInit();
+
+	UpdateHealthHUD();
 }
 
 void ABlasterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -190,6 +193,11 @@ void ABlasterCharacter::PlayReloadMontage()
 		case EWeaponType::EWT_RocketLauncher:
 				SectionName = FName("Rifle");	// 
 			break;
+		case EWeaponType::EWT_Pistol:
+			SectionName = FName("Rifle");	// 
+			break;
+		default:
+			SectionName = FName("Rifle");
 		}
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
@@ -313,8 +321,14 @@ void ABlasterCharacter::MulticastElim_Implementation()
 			ElimBotSound,
 			GetActorLocation());
 	}
+	bool bUseSniperAiming = IsLocallyControlled() && BlasterPlayerController &&
+		Combat && Combat->bIsAiming && Combat->EquippedWeapon &&
+		Combat->EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle; 
+	if (bUseSniperAiming)
+	{
+		BlasterPlayerController->SetHUDSniperScope(false);
+	} 
 }
-
 
 // start the timeline, and bind callback(UpdateDissolveMaterial) to dissolvetrack
 void ABlasterCharacter::StartDissolve()
@@ -466,7 +480,6 @@ void ABlasterCharacter::CalculateAO_Pitch()
 		// serilized -> compressed -> sent to network -> decompressed to [0, 360) range
 		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
 	}
-	UE_LOG(LogTemp, Error, TEXT("Pitch = %f"), AO_Pitch);
 }
 
 /**

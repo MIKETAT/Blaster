@@ -8,7 +8,6 @@
 #include "Blaster/HUD/BlasterHUD.h"
 #include "CombatComponent.generated.h"
 
-#define TRACE_LENGTH 80000.f
 
 enum class ECombatState : uint8;
 enum class EWeaponType : uint8;
@@ -58,9 +57,12 @@ protected:
 	void SetHUDCrosshairs(float DeltaTime);
 	
 private:
-	class ABlasterCharacter* Character;
+	UPROPERTY()
+	ABlasterCharacter* Character;
+	UPROPERTY()
 	class ABlasterPlayerController* Controller;
-	class ABlasterHUD* HUD;
+	UPROPERTY()
+	ABlasterHUD* HUD;
 
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	AWeapon* EquippedWeapon;

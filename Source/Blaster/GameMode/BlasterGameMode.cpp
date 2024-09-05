@@ -104,6 +104,7 @@ void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 	if (EliminatedCharacter)
 	{
 		EliminatedCharacter->Elim();
+		UE_LOG(LogTemp, Error, TEXT("%s is Ellimmed"), *EliminatedCharacter->GetName());
 	}
 }
 

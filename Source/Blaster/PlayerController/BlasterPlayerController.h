@@ -15,7 +15,6 @@ class BLASTER_API ABlasterPlayerController : public APlayerController
 	GENERATED_BODY()
 
 public:
-	ABlasterPlayerController();
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void ReceivedPlayer() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -27,6 +26,7 @@ public:
 	void SetHUDCountDown(float CountDown);
 	void SetHUDTime();
 	void SetHUDAnnouncementCountDown(float CountDown);
+	void SetHUDSniperScope(bool bShowScope);
 	virtual void OnPossess(APawn* InPawn) override;
 	void HandleMatchWaitToStart();
 	void HandleMatchStart();

@@ -6,6 +6,8 @@
 #include "GameFramework/HUD.h"
 #include "BlasterHUD.generated.h"
 
+class USniperScopeOverlayWidget;
+
 USTRUCT()
 struct FHUDPackage
 {
@@ -51,8 +53,22 @@ public:
 	UPROPERTY()
 	class UAnnouncement* Announcement;
 
+	UPROPERTY(EditAnywhere, Category = "Sniper Scope")
+	TSubclassOf<UUserWidget> SniperScopeClass;
+
+	UPROPERTY()
+	USniperScopeOverlayWidget* SniperScopeOverlayWidget;
+
+	UPROPERTY(EditAnywhere)
+	USoundCue* ZoomInSound;
+
+	UPROPERTY(EditAnywhere)
+	USoundCue* ZoomOutSound;
+
 	void AddCharacterOverlay();
 	bool AddAnnouncement();
+	void ShowSniperScopeOverlay(bool bShowScope);
+	
 protected:
 	virtual void BeginPlay() override;
 private:

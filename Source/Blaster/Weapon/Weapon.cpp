@@ -126,6 +126,7 @@ void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlapComponent, AActor* 
 
 void AWeapon::Drop()
 {
+	UE_LOG(LogTemp, Error, TEXT("Drop Weapon"));
 	SetWeaponState(EWeaponState::EWS_Dropped);
 	// Detach from Component
 	FDetachmentTransformRules DetachRules(EDetachmentRule::KeepWorld, true);

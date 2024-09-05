@@ -5,6 +5,7 @@
 #include "Blaster/HUD/Announcement.h"
 #include "Blaster/HUD/BlasterHUD.h"
 #include "Blaster/HUD/CharacterOverlay.h"
+#include "Blaster/HUD/SniperScopeOverlayWidget.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
@@ -29,8 +30,8 @@ void ABlasterPlayerController::ServerCheckMatchState_Implementation()
 		MatchTime = GameMode->MatchTime;
 		LevelStartTime = GameMode->LevelStartTime;
 		MatchState = GameMode->GetMatchState();
-		UE_LOG(LogTemp, Error, TEXT("in ServerCheckMatchState, MatchState = %s, MatchTime = %f, WarmupTime = %f, LevelStartTime = %f"),
-			*MatchState.ToString(), MatchTime, WarmupTime, LevelStartTime);
+		UE_LOG(LogTemp, Error, TEXT("in ServerCheckMatchState, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
+			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
 		ClientJoinGame_Implementation(MatchState, MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
 	} 
 }
@@ -68,11 +69,6 @@ void ABlasterPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	ServerCheckMatchState();
-}
-
-ABlasterPlayerController::ABlasterPlayerController()
-{
-	//PlayerCameraManager->Set
 }
 
 void ABlasterPlayerController::Tick(float DeltaSeconds)
@@ -173,6 +169,7 @@ void ABlasterPlayerController::SetHUDCarriedAmmo(int32 Ammo)
 
 void ABlasterPlayerController::SetHUDCountDown(float CountDown)
 {
+
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	bool bHUDValid = BlasterHUD &&
 		BlasterHUD->CharacterOverlay &&
@@ -193,7 +190,18 @@ void ABlasterPlayerController::SetHUDCountDown(float CountDown)
 		int32 Second = CountDown - Minute * 60;
 		FString CountDownText = FString::Printf(TEXT("%02d:%02d"), Minute, Second);
 		BlasterHUD->CharacterOverlay->MatchCountDownText->SetText(FText::FromString(CountDownText));
+	
 	}
+#if 0
+	if (!HasAuthority())
+	{
+		if (!GetHUD())	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDCountDown GetHUD is null"));
+		if (GetHUD())	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDCountDown GetHUD %s"), *GetHUD()->GetName());
+		if (!BlasterHUD)	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDCountDown BlasterHUD is null"));
+		if (BlasterHUD && !BlasterHUD->Announcement)	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDCountDown Announcement is null"));
+		if (BlasterHUD && BlasterHUD->Announcement && !BlasterHUD->Announcement->WarmupTime)	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDCountDown WarmupTime is null"));	
+	}
+#endif
 }
 
 void ABlasterPlayerController::SetHUDTime()
@@ -213,6 +221,14 @@ void ABlasterPlayerController::SetHUDTime()
 	else if (MatchState == MatchState::CoolDown)	TimeLeft = MatchTime - GetServerTime() + LevelStartTime + WarmupTime + CoolDownTime;
 	
 	int32 SecondLeft = FMath::CeilToInt(TimeLeft);
+
+	// 输出各个时间，看Client是否同步时间成功
+	if (!HasAuthority())
+	{
+		UE_LOG(LogTemp, Error, TEXT("OnClient, SetHUDTime, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
+			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
+	} 
+	
 	if (CountDownTime != SecondLeft)
 	{
 		if (MatchState == MatchState::WaitingToStart || MatchState == MatchState::CoolDown)
@@ -223,7 +239,6 @@ void ABlasterPlayerController::SetHUDTime()
 			SetHUDCountDown(TimeLeft);
 		}
 	}
-
 	CountDownTime = TimeLeft;
 }
 
@@ -241,13 +256,35 @@ void ABlasterPlayerController::SetHUDAnnouncementCountDown(float CountDown)
 			BlasterHUD->Announcement->WarmupTime->SetText(FText());
 			return;
 		}
-		
 		int32 Minute = FMath::FloorToInt(CountDown / 60);
 		int32 Second = CountDown - Minute * 60;
 		FString CountDownText = FString::Printf(TEXT("%02d:%02d"), Minute, Second);
 		BlasterHUD->Announcement->WarmupTime->SetText(FText::FromString(CountDownText));
 	}
+#if 0
+	if (!HasAuthority())
+	{
+		if (!GetHUD())	UE_LOG(LogTemp, Error, TEXT("OnClient  SetHUDAnnouncementCountDown GetHUD is null"));
+		if (GetHUD())	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDAnnouncementCountDown GetHUD %s"), *GetHUD()->GetName());
+		if (!BlasterHUD)	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDAnnouncementCountDown BlasterHUD is null"));
+		if (BlasterHUD && !BlasterHUD->Announcement)	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDAnnouncementCountDown Announcement is null"));
+		if (BlasterHUD && BlasterHUD->Announcement && !BlasterHUD->Announcement->WarmupTime)	UE_LOG(LogTemp, Error, TEXT("OnClient SetHUDAnnouncementCountDown WarmupTime is null"));	
+	}
+#endif
+	
 }
+
+void ABlasterPlayerController::SetHUDSniperScope(bool bShowScope)
+{
+	if (BlasterHUD)
+	{
+		if (!BlasterHUD->SniperScopeOverlayWidget->IsInViewport())
+		{
+			BlasterHUD->SniperScopeOverlayWidget->AddToViewport();
+		}
+		BlasterHUD->ShowSniperScopeOverlay(bShowScope);	
+	}
+}	
 
 void ABlasterPlayerController::OnPossess(APawn* InPawn)
 {
@@ -328,10 +365,6 @@ FString ABlasterPlayerController::GetCurrentTopPlayerInfo()
 	ABlasterGameState* BlasterGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
 	ABlasterPlayerState* BlasterPlayerState = Cast<ABlasterPlayerState>(GetPlayerState<ABlasterPlayerState>());
 	FString TopPlayerInfo;
-	if (base)
-	{
-		UE_LOG(LogTemp, Error, TEXT("1"));
-	}
 	
 	if (BlasterGameState && BlasterPlayerState)
 	{

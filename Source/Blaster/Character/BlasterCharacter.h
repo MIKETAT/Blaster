@@ -74,6 +74,9 @@ public:
 	// 处理初始化相关的逻辑，
 	void PollInit();
 
+	//UFUNCTION(BlueprintImplementableEvent)
+	//void ShowSniperScopeWidget(bool bShowScope);
+	
 protected:
 	virtual void BeginPlay() override;
 

@@ -3,6 +3,9 @@ DerivedDataCache
 Intermediate
 Saved
 Build
+Content
+Config
+
 
 .vscode
 .vs
@@ -14,5 +17,6 @@ Build
 *.suo
 *.xcodeproj
 *.xcworkspace
+*.uasset
 Source/ToDoList.md
 Source/Question.md

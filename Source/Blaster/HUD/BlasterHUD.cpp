@@ -6,6 +6,9 @@
 #include "Announcement.h"
 #include "CharacterOverlay.h"
 #include "Blueprint/UserWidget.h"
+#include "SniperScopeOverlayWidget.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundCue.h"
 
 void ABlasterHUD::BeginPlay()
 {
@@ -20,6 +23,10 @@ void ABlasterHUD::BeginPlay()
 	{
 		Announcement = CreateWidget<UAnnouncement>(PlayerController, AnnouncementClass);
 	}
+	if (SniperScopeClass)
+	{
+		SniperScopeOverlayWidget = CreateWidget<USniperScopeOverlayWidget>(PlayerController, SniperScopeClass);
+	}
 }
 
 // todo 变量初始化时机，有更合适的实现吗
@@ -32,7 +39,6 @@ void ABlasterHUD::AddCharacterOverlay()
 	/*if (CharacterOverlay == nullptr && CharacterOverlayClass)
 	{
 		CharacterOverlay = CreateWidget<UCharacterOverlay>(PlayerController, CharacterOverlayClass);
-		
 	}*/
 }
 
@@ -44,6 +50,23 @@ bool ABlasterHUD::AddAnnouncement()
 		return true;
 	}
 	return false;
+}
+
+void ABlasterHUD::ShowSniperScopeOverlay(bool bShowScope)
+{
+	if (!SniperScopeOverlayWidget || !SniperScopeOverlayWidget->ScopeZoomIn)	return;
+	if (bShowScope)
+	{
+		SniperScopeOverlayWidget->SetVisibility(ESlateVisibility::Visible);
+		SniperScopeOverlayWidget->PlayAnimationForward(SniperScopeOverlayWidget->ScopeZoomIn);
+		UGameplayStatics::PlaySound2D(GetWorld(), ZoomInSound);
+	} else
+	{
+		// 先播放动画，再Hide
+		SniperScopeOverlayWidget->PlayAnimationReverse(SniperScopeOverlayWidget->ScopeZoomIn);
+		UGameplayStatics::PlaySound2D(GetWorld(), ZoomOutSound);
+		SniperScopeOverlayWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
 }
 
 void ABlasterHUD::DrawHUD()
