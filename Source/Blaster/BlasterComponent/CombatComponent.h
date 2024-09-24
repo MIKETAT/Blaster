@@ -23,9 +23,15 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void EquipWeapon(class AWeapon* WeaponToEquipped);
+	bool CanFire() const;
 	
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
+
+	UFUNCTION(BlueprintCallable)
+	void ShotgunShellReload();
+
+	void JumpToShotgunEnd();
 protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool isAiming);
@@ -79,7 +85,7 @@ private:
 	bool bFireButtonPressed;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CarriedAmmo);
-	int32 CarriedAmmo;
+	int32 CarriedAmmo = 30;	// 先初始化一个值 方便测试
 
 	UPROPERTY(EditAnywhere)
 	int32 InitialAmmoAmount = 30;
@@ -128,5 +134,7 @@ private:
 
 	void HandleReload();
 	void UpdateCarriedAmmo();
+	void UpdateShotgunAmmoValues();
+	
 	int32 AmountToReload();
 };

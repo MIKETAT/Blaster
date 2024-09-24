@@ -5,6 +5,7 @@
 
 #include "KismetTraceUtils.h"
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Blaster/Character/BlasterAnimInstance.h"
 #include "Blaster/PlayerController/BlasterPlayerController.h"
 #include "Blaster/Weapon/Weapon.h"
 #include "Blaster/Weapon/WeaponTypes.h"
@@ -123,6 +124,15 @@ void UCombatComponent::OnRep_CarriedAmmo()
 	{
 		Controller->SetHUDCarriedAmmo(CarriedAmmo);
 	}
+	bool bJumpToShotgunEnd =
+		CombatState == ECombatState::ECS_Reloading &&
+		EquippedWeapon &&
+		EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun &&
+		CarriedAmmo == 0;
+	if (bJumpToShotgunEnd)
+	{
+		JumpToShotgunEnd();
+	}
 }
 
 // on client
@@ -158,9 +168,17 @@ void UCombatComponent::FireButtonPressed(bool bPressed)
 
 void UCombatComponent::Fire()
 {
-	// 无武器 || 武器无法开火(此刻不能开火/没子弹) || 当前状态不能开火
-	if (EquippedWeapon == nullptr || !EquippedWeapon->CanFire() || CombatState != ECombatState::ECS_UnOccupied)	return;
-	// todo 设置逻辑，子弹数为0时开火发出卡壳的声音
+	// out of ammo
+	if (EquippedWeapon && EquippedWeapon->GetAmmo() == 0 && EquippedWeapon->OutOfAmmoSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			EquippedWeapon->OutOfAmmoSound,
+			EquippedWeapon->GetActorLocation());
+	}
+	if (!CanFire())		return;
+	// 开火
+	EquippedWeapon->bCanFire = true;
 	EquippedWeapon->SetWeaponFireStatus(false);	// 开火执行时不能同时开火
 	ServerFire(HitTarget);
 	CrosshairShootingFactor = FMath::Max(CrosshairShootingFactor + 0.2f, 1.f);
@@ -217,6 +235,34 @@ void UCombatComponent::UpdateCarriedAmmo()
 	}
 }
 
+void UCombatComponent::UpdateShotgunAmmoValues()
+{
+	UE_LOG(LogTemp, Error, TEXT("Update Shotgun Ammo"));
+	if (Character == nullptr || EquippedWeapon == nullptr)	return;
+	for (const auto& it : CarriedAmmoMap)
+	{
+		UE_LOG(LogTemp, Error, TEXT("WeaponType = %d, Ammo = %d"), it.Key, it.Value);
+	}
+	
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] -= 1;
+		CarriedAmmo -= 1;
+		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
+		if (Controller)
+		{
+			Controller->SetHUDCarriedAmmo(CarriedAmmo);
+		}
+		EquippedWeapon->AddAmmo(1);
+		EquippedWeapon->bCanFire = true;
+	}
+	// 检查是否装满 or 没多余子弹了
+	if (EquippedWeapon->IsFull() || CarriedAmmo == 0)
+	{
+		JumpToShotgunEnd();
+	}
+}
+
 int32 UCombatComponent::AmountToReload()
 {
 	if (Character == nullptr || EquippedWeapon == nullptr)	return 0;
@@ -232,6 +278,7 @@ int32 UCombatComponent::AmountToReload()
 
 void UCombatComponent::Reload()
 {
+	if (EquippedWeapon == nullptr || EquippedWeapon->GetAmmo() >= EquippedWeapon->GetMaxCapacity())	return;
 	if (CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading)
 	{
 		ServerReload();
@@ -252,13 +299,19 @@ void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& Trac
 void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
 	if (EquippedWeapon == nullptr)	return;
+	if (Character && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
+	{
+		Character->PlayFireMontage(bIsAiming);
+		EquippedWeapon->Fire(TraceHitTarget);
+		CombatState = ECombatState::ECS_UnOccupied;
+		return;
+	}
 	if (Character && CombatState == ECombatState::ECS_UnOccupied)
 	{
 		Character->PlayFireMontage(bIsAiming);
 		EquippedWeapon->Fire(TraceHitTarget);
 	}
 }
-
 
 /**
  * Aiming Section
@@ -397,8 +450,18 @@ void UCombatComponent::OnRep_EquippedWeapon()
 // todo 是否可以根据enum WeaponType 遍历这些类，得到每种武器的最大弹容量，作为初始值初始化
 void UCombatComponent::InitWeaponAmmo()
 {
-	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRifle, InitialAmmoAmount);
+
+	const UEnum* EnumObj = FindObject<UEnum>(ANY_PACKAGE, TEXT("EWeaponType"), true);
 	
+	// 先随便写下方便测试
+	UEnum* MyEnum = StaticEnum<EWeaponType>();
+	for (int i = 0; i < MyEnum->NumEnums()-1; i++)
+	{
+		EWeaponType type = EWeaponType(MyEnum->GetValueByIndex(i));
+		CarriedAmmoMap.Emplace(type, InitialAmmoAmount);
+		UE_LOG(LogTemp, Error, TEXT("WeaponType = %s"), *EnumObj->GetDisplayNameTextByIndex(static_cast<uint8>(type)).ToString());
+	}
+	//CarriedAmmoMap.Emplace(EWeaponType::EWT_Shotgun, 2);
 }
 
 // only on server
@@ -454,6 +517,15 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 	Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
 }
 
+bool UCombatComponent::CanFire() const
+{
+	// 无武器 || 武器无法开火(此刻不能开火/没子弹) || 当前状态不能开火
+	if (EquippedWeapon == nullptr || !EquippedWeapon->CanFire())	return false;
+	// shotgun在换弹时也可开火
+	if (EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun && CombatState == ECombatState::ECS_Reloading)	return true;
+	return CombatState == ECombatState::ECS_UnOccupied;
+}
+
 void UCombatComponent::FinishReloading()
 {
 	if (Character == nullptr)	return;
@@ -468,4 +540,22 @@ void UCombatComponent::FinishReloading()
 	{
 		Fire();
 	}
+}
+
+void UCombatComponent::ShotgunShellReload()
+{
+	if (Character && Character->HasAuthority())
+	{
+		UpdateShotgunAmmoValues();	
+	}
+}
+
+void UCombatComponent::JumpToShotgunEnd()
+{
+	// Jump to ShotgunEnd
+	UAnimInstance* AnimInstance = Character->GetMesh()->GetAnimInstance();
+	if (AnimInstance && Character->GetReloadMontage())
+	{
+		AnimInstance->Montage_JumpToSection(FName("ShotgunEnd"));
+	}	
 }

@@ -28,12 +28,12 @@ void AShotgun::Fire(const FVector& HitTarget)
 		for (uint32 i = 0; i < NumberOfPellets; i++)
 		{
 			FVector EndLoc = TraceEndWithScatter(Start, HitTarget);
-			DrawDebugLine(
+			/*DrawDebugLine(
 				GetWorld(),
 				Start,
 				EndLoc,
 				FColor::Red,
-				true);
+				true);*/
 			// GetHitResult
 			FHitResult HitResult;
 			WeaponHit(Start, HitTarget, HitResult);

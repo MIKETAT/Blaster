@@ -17,6 +17,10 @@ public:
 	virtual void Destroyed() override;
 protected:
 	virtual void BeginPlay() override;
+	void StartDestoryTimer();
+	void DestroyTimerFinish();
+	void SpawnTrailSystem();
+	void ExplodeDamage();
 	// 这些callback都必须是 UFUNCTION
 	UFUNCTION()
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpluse, const FHitResult& Hit);
@@ -44,4 +48,21 @@ protected:
 	
 	UPROPERTY(EditAnywhere)
 	UStaticMeshComponent* ProjectileMesh;
+	
+	UPROPERTY(EditAnywhere)
+	class UNiagaraSystem* TrailSystem;
+
+	UPROPERTY()
+	class UNiagaraComponent* TrailSystemComponent;
+private:
+	FTimerHandle DestroyTimer;
+
+	UPROPERTY(EditAnywhere)
+	float DestroyTime;
+	
+	UPROPERTY(EditAnywhere)
+	float DamageInnerRadius = 200.f;
+	
+	UPROPERTY(EditAnywhere)
+	float DamageOuterRadius = 500.f;
 };

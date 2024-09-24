@@ -7,9 +7,7 @@
 #include "ProjectileRocket.generated.h"
 
 class UNiagaraComponent;
-/**
- * 
- */
+
 UCLASS()
 class BLASTER_API AProjectileRocket : public AProjectile
 {
@@ -22,14 +20,8 @@ public:
 	class URocketMovementComponent* RocketMovementComponent;
 protected:
 	virtual void BeginPlay() override;
-	
-	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpluse, const FHitResult& Hit) override;
-	virtual void DestroyTimerFinish();
-	UPROPERTY(EditAnywhere)
-	class UNiagaraSystem* TrailSystem;
 
-	UPROPERTY()
-	UNiagaraComponent* TrailSystemComponent;
+	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpluse, const FHitResult& Hit) override;
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* ProjectileLoopSound;
@@ -41,8 +33,5 @@ protected:
 	USoundAttenuation* ProjectileLoopAtt;
 	
 private:
-	FTimerHandle DestroyTimer;
 
-	UPROPERTY(EditAnywhere)
-	float DestroyTime;
 };

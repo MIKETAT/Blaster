@@ -88,6 +88,7 @@ void ABlasterCharacter::BeginPlay()
 		OnTakeAnyDamage.AddDynamic(this, &ABlasterCharacter::ReceiveDamage);
 	}
 }
+
 void ABlasterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -191,10 +192,22 @@ void ABlasterCharacter::PlayReloadMontage()
 				SectionName = FName("Rifle");
 				break;
 		case EWeaponType::EWT_RocketLauncher:
-				SectionName = FName("Rifle");	// 
+				SectionName = FName("RocketLauncher");	// 
 			break;
 		case EWeaponType::EWT_Pistol:
-			SectionName = FName("Rifle");	// 
+			SectionName = FName("Pistol");	
+			break;
+		case EWeaponType::EWT_SubmachineGun:
+			SectionName = FName("Pistol");	// Submachinegun 和 pistol 一样的换弹动画
+			break;
+		case EWeaponType::EWT_Shotgun:
+			SectionName = FName("Shotgun");
+			break;
+		case EWeaponType::EWT_SniperRifle:
+			SectionName = FName("SniperRifle");
+			break;
+		case EWeaponType::EWT_GrenadeLauncher:
+			SectionName = FName("GrenadeLauncher");
 			break;
 		default:
 			SectionName = FName("Rifle");

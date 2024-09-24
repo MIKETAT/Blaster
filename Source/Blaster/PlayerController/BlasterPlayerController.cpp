@@ -222,12 +222,15 @@ void ABlasterPlayerController::SetHUDTime()
 	
 	int32 SecondLeft = FMath::CeilToInt(TimeLeft);
 
+#if 0	
 	// 输出各个时间，看Client是否同步时间成功
 	if (!HasAuthority())
 	{
 		UE_LOG(LogTemp, Error, TEXT("OnClient, SetHUDTime, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
 			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
-	} 
+	}
+#endif
+	
 	
 	if (CountDownTime != SecondLeft)
 	{

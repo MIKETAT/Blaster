@@ -5,7 +5,6 @@
 
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "NiagaraFunctionLibrary.h"
 #include "Components/BoxComponent.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystemInstanceController.h"
@@ -15,6 +14,10 @@
 
 AProjectileRocket::AProjectileRocket()
 {
+	ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Projectile Rocket Mesh"));
+	ProjectileMesh->SetupAttachment(RootComponent);
+	ProjectileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	
 	
 	RocketMovementComponent = CreateDefaultSubobject<URocketMovementComponent>(TEXT("RocketMovementComponent"));
 	RocketMovementComponent->bRotationFollowsVelocity = true;
@@ -32,17 +35,7 @@ void AProjectileRocket::Destroyed()
 void AProjectileRocket::BeginPlay()
 {
 	Super::BeginPlay();
-	if (TrailSystem)
-	{
-		TrailSystemComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
-			TrailSystem,
-			GetRootComponent(),
-			FName(),
-			GetActorLocation(),
-			GetActorRotation(),
-			EAttachLocation::KeepWorldPosition,
-			false);
-	}
+	SpawnTrailSystem();
 	// Client 绑定 OnHit
 	if (!HasAuthority())
 	{
@@ -75,33 +68,8 @@ void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	{
 		return;
 	}
-	APawn* FiringPawn = GetInstigator();
-	if (FiringPawn && HasAuthority())
-	{
-		AController* InstigatorController = FiringPawn->GetController();
-		if (InstigatorController)
-		{
-			UGameplayStatics::ApplyRadialDamageWithFalloff(
-				this,
-				120.f,
-				10.f,
-				GetActorLocation(),
-				200.f,
-				500.f,
-				1.f,
-				UDamageType::StaticClass(),
-				TArray<AActor*>(),
-				this,
-				InstigatorController);
-		}
-	}
-	// delay destroy
-	GetWorldTimerManager().SetTimer(
-		DestroyTimer,
-		this,
-		&AProjectileRocket::DestroyTimerFinish,
-		DestroyTime
-	);
+	ExplodeDamage();
+	StartDestoryTimer();
 	// Play Sound and Effect
 	if (ImpactParticles)
 	{
@@ -129,9 +97,4 @@ void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 	{
 		ProjectileLoopComponent->Stop();
 	}
-}
-
-void AProjectileRocket::DestroyTimerFinish()
-{
-	Destroyed();
 }

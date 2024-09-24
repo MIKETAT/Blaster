@@ -11,6 +11,7 @@
 #include "GameFramework/Character.h"
 #include "BlasterCharacter.generated.h"
 
+class UCombatComponent;
 class ABlasterPlayerState;
 enum class ECombatState : uint8;
 class UTimelineComponent;
@@ -61,7 +62,10 @@ public:
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 	FORCEINLINE ABlasterPlayerState* GetBlasterPlayerState() const { return BlasterPlayerState; }
+	FORCEINLINE UAnimMontage* GetReloadMontage() const { return ReloadMontage; }
+	FORCEINLINE UCombatComponent* GetCombat() const { return Combat; }
 	ECombatState GetCombatState() const;
+	
 	float CalculateSpeed();
 	void UpdateHealthHUD();
 	
@@ -79,7 +83,6 @@ public:
 	
 protected:
 	virtual void BeginPlay() override;
-
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 	void Turn(float Value);

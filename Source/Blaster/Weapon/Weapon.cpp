@@ -7,6 +7,7 @@
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Casing.h"
+#include "Blaster/BlasterComponent/CombatComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 
 // Sets default values
@@ -189,7 +190,11 @@ void AWeapon::OnRep_WeaponState()
 
 void AWeapon::OnRep_Ammo()
 {
-	// Ammo already updated
+	BlasterOwner = BlasterOwner == nullptr ? Cast<ABlasterCharacter>(GetOwner()) : BlasterOwner;
+	if (BlasterOwner && BlasterOwner->GetCombat())
+	{
+		BlasterOwner->GetCombat()->JumpToShotgunEnd();
+	}
 	SetHUDAmmo();
 }
 

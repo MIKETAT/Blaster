@@ -40,6 +40,7 @@ public:
 	FORCEINLINE float GetFireDelay() const { return FireDelay; }
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE bool IsEmpty() const { return Ammo == 0; }
+	FORCEINLINE bool IsFull() const { return Ammo == MaxCapacity; }
 	FORCEINLINE int32 GetMaxCapacity() const { return MaxCapacity; }
 	void SetWeaponFireStatus(bool CanFire);
 	FORCEINLINE FTimerHandle& GetFireTimer() { return FireTimer; }
@@ -53,6 +54,9 @@ public:
 	void SpendRound();
 	void SetHUDAmmo();
 	void AddAmmo(int AmmoAmount);
+	
+	UPROPERTY()
+	bool bCanFire = true;
 protected:
 	virtual void BeginPlay() override;
 
@@ -93,8 +97,6 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category = Combat)
 	float FireDelay = .15f;
-
-	bool bCanFire = true;
 	
 	UFUNCTION()
 	void OnRep_WeaponState();
@@ -151,4 +153,7 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* EquipSound;
+
+	UPROPERTY(EditAnywhere)
+	USoundCue* OutOfAmmoSound;
 };
