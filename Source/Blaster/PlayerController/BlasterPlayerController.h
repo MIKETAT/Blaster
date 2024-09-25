@@ -21,8 +21,8 @@ public:
 	void SetHUDHealth(float Health, float MaxHealth);
 	void SetHUDScore(float Score);
 	void SetHUDDefeats(int32 Defeats);
-	void SetHUDWeaponAmmo(int32 Ammo);
-	void SetHUDCarriedAmmo(int32 Ammo);
+	void SetHUDAmmo(int32 Ammo, int32 CarriedAmmo);
+	//void SetHUDCarriedAmmo(int32 Ammo);
 	void SetHUDCountDown(float CountDown);
 	void SetHUDTime();
 	void SetHUDAnnouncementCountDown(float CountDown);

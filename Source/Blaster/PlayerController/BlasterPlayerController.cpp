@@ -140,21 +140,22 @@ void ABlasterPlayerController::SetHUDDefeats(int32 Defeats)
 	}
 }
 
-void ABlasterPlayerController::SetHUDWeaponAmmo(int32 Ammo)
+// 显示当前子弹数
+void ABlasterPlayerController::SetHUDAmmo(int32 Ammo, int32 CarriedAmmo)
 {
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	bool bHUDValid = BlasterHUD &&
 		BlasterHUD->CharacterOverlay &&
-		BlasterHUD->CharacterOverlay->WeaponAmmoAmount;
+		BlasterHUD->CharacterOverlay->AmmoAmount;
 	if (bHUDValid)
 	{
-		FString AmmoText = FString::Printf(TEXT("Ammo : %d"), Ammo);
-		BlasterHUD->CharacterOverlay->WeaponAmmoAmount->SetText(FText::FromString(AmmoText));
+		FString AmmoText = FString::Printf(TEXT("Ammo:%d/%d"), Ammo, CarriedAmmo);
+		BlasterHUD->CharacterOverlay->AmmoAmount->SetText(FText::FromString(AmmoText));
 	}
 }
 
 // todo Ammo/CarriedAmmo 使用同一个TextBlock实现
-void ABlasterPlayerController::SetHUDCarriedAmmo(int32 Ammo)
+/*void ABlasterPlayerController::SetHUDCarriedAmmo(int32 Ammo)
 {
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	bool bHUDValid = BlasterHUD &&
@@ -165,7 +166,7 @@ void ABlasterPlayerController::SetHUDCarriedAmmo(int32 Ammo)
 		FString CarriedAmmoText = FString::Printf(TEXT("Carried : %d"), Ammo);
 		BlasterHUD->CharacterOverlay->CarriedAmmoAmount->SetText(FText::FromString(CarriedAmmoText));
 	}
-}
+}*/
 
 void ABlasterPlayerController::SetHUDCountDown(float CountDown)
 {

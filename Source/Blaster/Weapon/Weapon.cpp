@@ -7,6 +7,7 @@
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Casing.h"
+#include "WeaponTypes.h"
 #include "Blaster/BlasterComponent/CombatComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 
@@ -24,6 +25,9 @@ AWeapon::AWeapon()
 	WeaponMesh->SetCollisionResponseToAllChannels(ECR_Block);
 	WeaponMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
+	WeaponMesh->MarkRenderStateDirty();	// force a refresh
+	EnableCustomDepth(true);
 	
 	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
 	AreaSphere->SetupAttachment(RootComponent);
@@ -154,6 +158,7 @@ void AWeapon::SetWeaponState(EWeaponState state)
 		// Disable Physics and Collision
 		AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		SetWeaponPhysicsAndCollision(false);
+		EnableCustomDepth(false);
 		break;
 	case EWeaponState::EWS_Dropped:
 		SetWeaponPhysicsAndCollision(true);
@@ -161,7 +166,12 @@ void AWeapon::SetWeaponState(EWeaponState state)
 		{
 			AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);	
 		}
+		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
+		WeaponMesh->MarkRenderStateDirty();	// force a refresh
+		EnableCustomDepth(true);
 		break;
+	default:
+		break;		
 	}
 }
 
@@ -178,9 +188,13 @@ void AWeapon::OnRep_WeaponState()
 		ShowPickupWidget(false);
 		//AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		SetWeaponPhysicsAndCollision(false);
+		EnableCustomDepth(false);
 		break;
 	case EWeaponState::EWS_Dropped:
 		SetWeaponPhysicsAndCollision(true);
+		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
+		WeaponMesh->MarkRenderStateDirty();	// force a refresh
+		EnableCustomDepth(true);
 		break;
 	default:
 		break;
@@ -221,12 +235,12 @@ void AWeapon::SpendRound()
 void AWeapon::SetHUDAmmo()
 {
 	BlasterOwner = BlasterOwner == nullptr ? Cast<ABlasterCharacter>(GetOwner()) : BlasterOwner;
-	if (BlasterOwner)
+	if (BlasterOwner && BlasterOwner->GetCombat())
 	{
 		BlasterController = BlasterController == nullptr ? Cast<ABlasterPlayerController>(BlasterOwner->Controller) : BlasterController;
 		if (BlasterController)
 		{
-			BlasterController->SetHUDWeaponAmmo(Ammo);
+			BlasterController->SetHUDAmmo(Ammo, BlasterOwner->GetCombat()->GetCarriedAmmo());
 		}
 	}
 }
@@ -235,4 +249,12 @@ void AWeapon::AddAmmo(int AmmoAmount)
 {
 	Ammo = FMath::Clamp(Ammo + AmmoAmount, 0, MaxCapacity);
 	SetHUDAmmo();
+}
+
+void AWeapon::EnableCustomDepth(bool bEnable)
+{
+	if (WeaponMesh)
+	{
+		WeaponMesh->SetRenderCustomDepth(bEnable);
+	}
 }

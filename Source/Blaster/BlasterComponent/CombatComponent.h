@@ -22,6 +22,8 @@ public:
 	friend class ABlasterCharacter;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	FORCEINLINE int32 GetCarriedAmmo() const { return CarriedAmmo; }
 	void EquipWeapon(class AWeapon* WeaponToEquipped);
 	bool CanFire() const;
 	
@@ -32,6 +34,9 @@ public:
 	void ShotgunShellReload();
 
 	void JumpToShotgunEnd();
+	
+	UFUNCTION(BlueprintCallable)
+	void ThrowGrenadeFinished();
 protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool isAiming);
@@ -45,6 +50,10 @@ protected:
 	void FireTimerFinished();
 
 	void Reload();
+	void ThrowGrenade();
+
+	UFUNCTION(Server, Reliable)
+	void ServerThrowGrenade();
 	
 	UFUNCTION(Server, Reliable)
 	void ServerSetAiming(bool isAiming);
@@ -131,9 +140,16 @@ private:
 	void OnRep_EquippedWeapon();
 
 	void InitWeaponAmmo();
+	void DropEquippedWeapon();
+	void AttachActorToRightHand(AActor* ActorToAttach);
+	void AttachActorToLeftHand(AActor* ActorToAttach);
+
+	// update ammo and the hud
+	void UpdateAmmo();
 
 	void HandleReload();
-	void UpdateCarriedAmmo();
+	void PlayEquipWeaponSound();
+	void AutoReloadEmptyWeapon();
 	void UpdateShotgunAmmoValues();
 	
 	int32 AmountToReload();

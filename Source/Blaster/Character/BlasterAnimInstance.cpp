@@ -41,9 +41,9 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsCrouched = BlasterCharacter->bIsCrouched;
 	bIsAiming = BlasterCharacter->isAiming();
 	bElimmed = BlasterCharacter->IsElimmed();
-	bUseFABRIK = BlasterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
-	bUseAimOffsets = BlasterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
-	bUseTransformRightHand = BlasterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+	bUseFABRIK = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
+	bUseAimOffsets = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
+	bUseTransformRightHand = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
 	TurningInPlace = BlasterCharacter->GetTurningInPlace();
 
 	// GlobalRotation 是controller相对世界的rotation

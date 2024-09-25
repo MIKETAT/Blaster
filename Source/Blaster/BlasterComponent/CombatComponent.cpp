@@ -120,9 +120,9 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 void UCombatComponent::OnRep_CarriedAmmo()
 {
 	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
-	if (Controller)
+	if (Controller && EquippedWeapon)
 	{
-		Controller->SetHUDCarriedAmmo(CarriedAmmo);
+		Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 	}
 	bool bJumpToShotgunEnd =
 		CombatState == ECombatState::ECS_Reloading &&
@@ -149,6 +149,13 @@ void UCombatComponent::OnRep_CombatState()
 			break;
 		case ECombatState::ECS_Reloading:
 			HandleReload();
+			break;
+		case ECombatState::ECS_ThrowingGrenade:
+			if (Character && !Character->IsLocallyControlled())
+			{
+				Character->PlayThrowGrenadeMontage();
+				AttachActorToLeftHand(EquippedWeapon);
+			}
 			break;
 	}
 }
@@ -204,10 +211,7 @@ void UCombatComponent::FireTimerFinished()
 	{
 		Fire();
 	}
-	if (EquippedWeapon->IsEmpty())
-	{
-		Reload();
-	}
+	AutoReloadEmptyWeapon();
 }
 
 // todo reload的动画需要改，只上半身reload，不影响下半身，不会改变状态(蹲下->站起)这种
@@ -218,7 +222,9 @@ void UCombatComponent::HandleReload()
 }
 
 // on server
-void UCombatComponent::UpdateCarriedAmmo()
+// update the ammo
+// todo 不同子弹类型不应该使用同一个carriedAmmo, 后续到pickup时解决这个问题
+void UCombatComponent::UpdateAmmo()
 {
 	if (Character == nullptr || EquippedWeapon == nullptr)	return;
 	int32 ReloadAmount = AmountToReload();
@@ -229,7 +235,7 @@ void UCombatComponent::UpdateCarriedAmmo()
 		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
 		if (Controller)
 		{
-			Controller->SetHUDCarriedAmmo(CarriedAmmo);
+			Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 		}
 		EquippedWeapon->AddAmmo(ReloadAmount);
 	}
@@ -251,7 +257,7 @@ void UCombatComponent::UpdateShotgunAmmoValues()
 		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
 		if (Controller)
 		{
-			Controller->SetHUDCarriedAmmo(CarriedAmmo);
+			Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 		}
 		EquippedWeapon->AddAmmo(1);
 		EquippedWeapon->bCanFire = true;
@@ -279,9 +285,33 @@ int32 UCombatComponent::AmountToReload()
 void UCombatComponent::Reload()
 {
 	if (EquippedWeapon == nullptr || EquippedWeapon->GetAmmo() >= EquippedWeapon->GetMaxCapacity())	return;
-	if (CarriedAmmo > 0 && CombatState != ECombatState::ECS_Reloading)
+	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_UnOccupied)
 	{
 		ServerReload();
+	}
+}
+
+void UCombatComponent::ThrowGrenade()
+{
+	if (CombatState != ECombatState::ECS_UnOccupied || !Character)	return;
+	CombatState = ECombatState::ECS_ThrowingGrenade;
+	if (Character->HasAuthority())
+	{
+		Character->PlayThrowGrenadeMontage();
+		AttachActorToLeftHand(EquippedWeapon);
+	} else
+	{
+		ServerThrowGrenade();
+	}
+}
+
+void UCombatComponent::ServerThrowGrenade_Implementation()
+{
+	CombatState = ECombatState::ECS_ThrowingGrenade;
+	if (Character)
+	{
+		Character->PlayThrowGrenadeMontage();
+		AttachActorToLeftHand(EquippedWeapon); // save?
 	}
 }
 
@@ -420,11 +450,7 @@ void UCombatComponent::OnRep_EquippedWeapon()
 	{
 		// TODO 为什么下面这段不加上，client依然可以执行捡起武器。
 		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-		const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
-		if (HandSocket)
-		{
-			HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
-		}
+		AttachActorToRightHand(EquippedWeapon);
 		
 		Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
 		Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
@@ -432,17 +458,9 @@ void UCombatComponent::OnRep_EquippedWeapon()
 		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
 		if (Controller)
 		{
-			Controller->SetHUDCarriedAmmo(CarriedAmmo);
+			Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 		}
-		
-		if (EquippedWeapon->EquipSound)
-		{
-			UGameplayStatics::PlaySoundAtLocation(
-				this,
-				EquippedWeapon->EquipSound,
-				EquippedWeapon->GetActorLocation()
-			);
-		}
+		PlayEquipWeaponSound();
 	}
 }
 
@@ -450,7 +468,6 @@ void UCombatComponent::OnRep_EquippedWeapon()
 // todo 是否可以根据enum WeaponType 遍历这些类，得到每种武器的最大弹容量，作为初始值初始化
 void UCombatComponent::InitWeaponAmmo()
 {
-
 	const UEnum* EnumObj = FindObject<UEnum>(ANY_PACKAGE, TEXT("EWeaponType"), true);
 	
 	// 先随便写下方便测试
@@ -464,42 +481,40 @@ void UCombatComponent::InitWeaponAmmo()
 	//CarriedAmmoMap.Emplace(EWeaponType::EWT_Shotgun, 2);
 }
 
-// only on server
-void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
+void UCombatComponent::DropEquippedWeapon()
 {
-	if (!Character || !WeaponToEquipped)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Character or WeaponToEquipped is null, return"));
-		return;
-	}
 	if (EquippedWeapon)
 	{
 		EquippedWeapon->Drop();	// 已有武器则扔掉替换
 	}
-	EquippedWeapon = WeaponToEquipped;
-	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+}
 
-	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
-	{
-		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
-	}
-	
-	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
-	if (Controller)
-	{
-		Controller->SetHUDCarriedAmmo(CarriedAmmo);
-	}
-	
+void UCombatComponent::AttachActorToRightHand(AActor* ActorToAttach)
+{
+	if (Character == nullptr || Character->GetMesh() == nullptr || ActorToAttach == nullptr)	return;
 	// todo 为什么这里不在client执行AttachActor，client照样能完成捡起武器
 	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
 	if (HandSocket)
 	{
-		HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
+		HandSocket->AttachActor(ActorToAttach, Character->GetMesh());
 	}
-	EquippedWeapon->SetOwner(Character);
-	EquippedWeapon->ShowPickupWidget(false);
-	EquippedWeapon->SetHUDAmmo();
-	if (EquippedWeapon->EquipSound)
+}
+
+// todo: pistol submachinegun 的socket需要单独调整	p151-22:00
+void UCombatComponent::AttachActorToLeftHand(AActor* ActorToAttach)
+{
+	if (Character == nullptr || Character->GetMesh() == nullptr || ActorToAttach == nullptr)	return;
+	// bUsePistolSocket
+	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("LeftHandSocket"));
+	if (HandSocket)
+	{
+		HandSocket->AttachActor(ActorToAttach, Character->GetMesh());
+	}
+}
+
+void UCombatComponent::PlayEquipWeaponSound()
+{
+	if (EquippedWeapon && EquippedWeapon->EquipSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(
 			this,
@@ -507,11 +522,33 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 			EquippedWeapon->GetActorLocation()
 		);
 	}
-	
-	if (EquippedWeapon->IsEmpty())
+}
+
+void UCombatComponent::AutoReloadEmptyWeapon()
+{
+	if (EquippedWeapon && EquippedWeapon->IsEmpty())
 	{
 		Reload();
 	}
+}
+
+// only on server
+void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
+{
+	if (!Character || !WeaponToEquipped)				return;
+	if (CombatState != ECombatState::ECS_UnOccupied)	return;
+	
+	DropEquippedWeapon();
+	EquippedWeapon = WeaponToEquipped;
+	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	
+	AttachActorToRightHand(EquippedWeapon);
+	EquippedWeapon->SetOwner(Character);
+	EquippedWeapon->ShowPickupWidget(false);
+	EquippedWeapon->SetHUDAmmo();
+	
+	PlayEquipWeaponSound();
+	AutoReloadEmptyWeapon();
 	
 	Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
 	Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
@@ -533,7 +570,7 @@ void UCombatComponent::FinishReloading()
 	if (Character->HasAuthority())
 	{
 		CombatState = ECombatState::ECS_UnOccupied;
-		UpdateCarriedAmmo();
+		UpdateAmmo();
 	}
 	// 换弹完成，仍按住了开火
 	if (bFireButtonPressed)
@@ -558,4 +595,10 @@ void UCombatComponent::JumpToShotgunEnd()
 	{
 		AnimInstance->Montage_JumpToSection(FName("ShotgunEnd"));
 	}	
+}
+
+void UCombatComponent::ThrowGrenadeFinished()
+{
+	CombatState = ECombatState::ECS_UnOccupied;
+	AttachActorToRightHand(EquippedWeapon);
 }

@@ -42,6 +42,7 @@ public:
 	void PlayFireMontage(bool bAiming);
 	void PlayReloadMontage();
 	void PlayElimMontage();
+	void PlayThrowGrenadeMontage();
 	FVector GetHitTarget() const;
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
@@ -92,6 +93,7 @@ protected:
 	void AimButtonPressed();
 	void AimButtonReleased();
 	void ReloadButtomPressed();
+	void GrenadeButtonPressed();
 	void CalculateAO_Pitch();
 	void AimOffset(float DeltaTime);
 	void SimProxiesTurn();
@@ -145,7 +147,9 @@ private:
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* ReloadMontage;
 	
-
+	UPROPERTY(EditAnywhere, Category= Combat)
+	UAnimMontage* ThrowGrenadeMontage;
+	
 	bool bRotateRootBone;
 	// 超过这个阈值，在SimProxy执行turn animation
 	float TurnThreshold = 0.5f;
@@ -206,6 +210,12 @@ private:
 	USoundCue* ElimBotSound;
 
 	class ABlasterPlayerState* BlasterPlayerState;
+	
+	/**
+	 * Grenade
+	 */
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* AttachedGrenade;
 	
 	UFUNCTION()		// bind to track, so it needs to be UFUNCTION
 	void UpdateDissolveMaterial(float DissolveValue);

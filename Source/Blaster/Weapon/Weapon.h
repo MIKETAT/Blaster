@@ -54,6 +54,11 @@ public:
 	void SpendRound();
 	void SetHUDAmmo();
 	void AddAmmo(int AmmoAmount);
+
+	/**
+	 * Enable or Disable custom depth
+	 */
+	void EnableCustomDepth(bool bEnable);
 	
 	UPROPERTY()
 	bool bCanFire = true;
