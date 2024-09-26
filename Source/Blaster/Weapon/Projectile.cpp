@@ -88,6 +88,7 @@ void AProjectile::ExplodeDamage()
 		AController* InstigatorController = FiringPawn->GetController();
 		if (InstigatorController)
 		{
+			// todo why it doesn't need to know which actor is being damaged?
 			UGameplayStatics::ApplyRadialDamageWithFalloff(
 				this,
 				120.f,

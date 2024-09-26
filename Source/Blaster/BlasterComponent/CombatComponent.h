@@ -24,8 +24,11 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	FORCEINLINE int32 GetCarriedAmmo() const { return CarriedAmmo; }
+	FORCEINLINE int32 GetGrenades() const { return Grenades; }
 	void EquipWeapon(class AWeapon* WeaponToEquipped);
 	bool CanFire() const;
+	
+	void PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount);
 	
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
@@ -37,6 +40,13 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	void ThrowGrenadeFinished();
+
+	UFUNCTION(BlueprintCallable)
+	void LaunchGrenade();
+
+	UFUNCTION(Server, Reliable)
+	void ServerLaunchGrenade(const FVector_NetQuantize& Target);
+	
 protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool isAiming);
@@ -51,6 +61,7 @@ protected:
 
 	void Reload();
 	void ThrowGrenade();
+	void ShowGrenade(bool bShowGrenade);
 
 	UFUNCTION(Server, Reliable)
 	void ServerThrowGrenade();
@@ -70,6 +81,9 @@ protected:
 	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
 
 	void SetHUDCrosshairs(float DeltaTime);
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class AProjectile> GrenadeClass;
 	
 private:
 	UPROPERTY()
@@ -94,7 +108,16 @@ private:
 	bool bFireButtonPressed;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CarriedAmmo);
-	int32 CarriedAmmo = 30;	// 先初始化一个值 方便测试
+	int32 CarriedAmmo = 30;	// 当前所装备武器的携带数量
+
+	UPROPERTY(EditAnywhere)
+	int32 MaxAmmoAmount = 500;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Grenades)
+	int32 Grenades = 5;
+
+	UPROPERTY(EditAnywhere)
+	int32 MaxGrenades = 5;
 
 	UPROPERTY(EditAnywhere)
 	int32 InitialAmmoAmount = 30;
@@ -104,6 +127,9 @@ private:
 	
 	UFUNCTION()
 	void OnRep_CarriedAmmo();
+
+	UFUNCTION()
+	void OnRep_Grenades();
 
 	UFUNCTION()
 	void OnRep_CombatState();
@@ -145,7 +171,9 @@ private:
 	void AttachActorToLeftHand(AActor* ActorToAttach);
 
 	// update ammo and the hud
-	void UpdateAmmo();
+	void ReloadAmmo();
+	void UpdateAmmoHUD();
+	void UpdateGrenades();
 
 	void HandleReload();
 	void PlayEquipWeaponSound();

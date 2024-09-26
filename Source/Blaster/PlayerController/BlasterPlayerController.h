@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "BlasterPlayerController.generated.h"
 
+class ABlasterCharacter;
 /**
  * 
  */
@@ -13,7 +14,6 @@ UCLASS()
 class BLASTER_API ABlasterPlayerController : public APlayerController
 {
 	GENERATED_BODY()
-
 public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void ReceivedPlayer() override;
@@ -22,7 +22,7 @@ public:
 	void SetHUDScore(float Score);
 	void SetHUDDefeats(int32 Defeats);
 	void SetHUDAmmo(int32 Ammo, int32 CarriedAmmo);
-	//void SetHUDCarriedAmmo(int32 Ammo);
+	void SetHUDGrenades(int32 Grenades);
 	void SetHUDCountDown(float CountDown);
 	void SetHUDTime();
 	void SetHUDAnnouncementCountDown(float CountDown);
@@ -50,7 +50,6 @@ public:
 	void ClientJoinGame(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime);
 
 	virtual float GetServerTime();	// synced with server clock
-
 protected:
 	virtual void BeginPlay() override;
 private:
@@ -71,7 +70,7 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_MatchState)
 	FName MatchState;
-
+	
 	// init HUD
 	bool bInitialize = false;
 	

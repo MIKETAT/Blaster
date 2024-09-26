@@ -72,7 +72,6 @@ void ABlasterCharacter::Destroyed()
 	}
 }
 
-
 void ABlasterCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -81,7 +80,6 @@ void ABlasterCharacter::BeginPlay()
 
 	// init
 	Health = MaxHealth;
-	
 	if (Combat == nullptr)
 	{
 		Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
@@ -90,6 +88,10 @@ void ABlasterCharacter::BeginPlay()
 	if (HasAuthority())
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ABlasterCharacter::ReceiveDamage);
+	}
+	if (AttachedGrenade)
+	{
+		AttachedGrenade->SetVisibility(false);
 	}
 }
 
@@ -116,7 +118,6 @@ void ABlasterCharacter::Tick(float DeltaTime)
 	}
 	// initialization
 	PollInit();
-
 	UpdateHealthHUD();
 }
 
@@ -655,6 +656,7 @@ void ABlasterCharacter::PlayHitReactMontage()
 void ABlasterCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,
 	AController* InstigatorController, AActor* DamageCauser)
 {
+	if (bElimmed)	return;
 	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
 	UpdateHealthHUD();
 	PlayHitReactMontage();

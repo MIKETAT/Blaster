@@ -15,6 +15,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundCue.h"
+#include "Blaster/Weapon/Projectile.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -32,6 +33,7 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(UCombatComponent, bIsAiming);
 	DOREPLIFETIME(UCombatComponent, CombatState);
 	DOREPLIFETIME_CONDITION(UCombatComponent, CarriedAmmo, COND_OwnerOnly);	//只需要复制给持有者即可，无需复制给其他玩家，节省带宽
+	DOREPLIFETIME(UCombatComponent, Grenades);	// todo 是否可以使用DOREPLIFETIME_CONDITION
 	// todo condition用法详解
 }
 
@@ -135,6 +137,11 @@ void UCombatComponent::OnRep_CarriedAmmo()
 	}
 }
 
+void UCombatComponent::OnRep_Grenades()
+{
+	UpdateGrenades();
+}
+
 // on client
 void UCombatComponent::OnRep_CombatState()
 {
@@ -155,6 +162,7 @@ void UCombatComponent::OnRep_CombatState()
 			{
 				Character->PlayThrowGrenadeMontage();
 				AttachActorToLeftHand(EquippedWeapon);
+				ShowGrenade(true);
 			}
 			break;
 	}
@@ -221,23 +229,67 @@ void UCombatComponent::HandleReload()
 	Character->PlayReloadMontage();
 }
 
+// 更新子弹HUD
+void UCombatComponent::UpdateAmmoHUD()
+{
+	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
+	if (Controller == nullptr)	return;
+	if (EquippedWeapon)
+	{
+		Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
+	} else
+	{
+		Controller->SetHUDAmmo(0, 0);
+	}
+}
+
 // on server
-// update the ammo
+// reload the ammo
 // todo 不同子弹类型不应该使用同一个carriedAmmo, 后续到pickup时解决这个问题
-void UCombatComponent::UpdateAmmo()
+void UCombatComponent::ReloadAmmo()
 {
 	if (Character == nullptr || EquippedWeapon == nullptr)	return;
 	int32 ReloadAmount = AmountToReload();
 	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
-		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] -= ReloadAmount;
 		CarriedAmmo -= ReloadAmount;
-		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
-		if (Controller)
-		{
-			Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
-		}
+		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] = CarriedAmmo;
 		EquippedWeapon->AddAmmo(ReloadAmount);
+		UpdateAmmoHUD();
+	}
+}
+
+
+void UCombatComponent::PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount)
+{
+	if (GEngine)
+	{
+		const UEnum* EnumObj = FindObject<UEnum>(ANY_PACKAGE, TEXT("EWeaponType"), true);
+		FString WeaponTypeStr = *EnumObj->GetDisplayNameTextByIndex(static_cast<uint8>(WeaponType)).ToString();
+		FString Info = FString::Printf(TEXT("Picked %s Ammo %d"), *WeaponTypeStr, AmmoAmount);
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, Info, true, FVector2D(4.f, 4.f));
+	}
+	if (CarriedAmmoMap.Contains(WeaponType))
+	{
+		CarriedAmmoMap[WeaponType] = FMath::Clamp(CarriedAmmoMap[WeaponType] + AmmoAmount, 0, MaxAmmoAmount);
+		if (EquippedWeapon && EquippedWeapon->GetWeaponType() == WeaponType)
+		{
+			CarriedAmmo = CarriedAmmoMap[WeaponType];
+		}
+		UpdateAmmoHUD();
+	}
+	if (EquippedWeapon && EquippedWeapon->GetWeaponType() == WeaponType && EquippedWeapon->IsEmpty())
+	{
+		Reload();
+	}
+}
+
+void UCombatComponent::UpdateGrenades()
+{
+	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
+	if (Controller)
+	{
+		Controller->SetHUDGrenades(Grenades);
 	}
 }
 
@@ -293,26 +345,44 @@ void UCombatComponent::Reload()
 
 void UCombatComponent::ThrowGrenade()
 {
-	if (CombatState != ECombatState::ECS_UnOccupied || !Character)	return;
+	if (Grenades == 0)	return;	// todo if on clinet, what if client is cheating 
+	
+	// todo 没有武器时是否可以扔雷
+	if (CombatState != ECombatState::ECS_UnOccupied || !Character || EquippedWeapon == nullptr)	return;
 	CombatState = ECombatState::ECS_ThrowingGrenade;
+	Character->PlayThrowGrenadeMontage();
+	AttachActorToLeftHand(EquippedWeapon);
+	ShowGrenade(true);
 	if (Character->HasAuthority())
 	{
-		Character->PlayThrowGrenadeMontage();
-		AttachActorToLeftHand(EquippedWeapon);
+		Grenades = FMath::Clamp(Grenades - 1, 0, MaxGrenades);
+		UpdateGrenades();
 	} else
 	{
 		ServerThrowGrenade();
 	}
 }
 
+void UCombatComponent::ShowGrenade(bool bShowGrenade)
+{
+	if (Character && Character->GetAttachedGrenade())
+	{
+		Character->GetAttachedGrenade()->SetVisibility(bShowGrenade);
+	}
+}
+
 void UCombatComponent::ServerThrowGrenade_Implementation()
 {
+	if (Grenades == 0)	return;
 	CombatState = ECombatState::ECS_ThrowingGrenade;
 	if (Character)
 	{
 		Character->PlayThrowGrenadeMontage();
 		AttachActorToLeftHand(EquippedWeapon); // save?
+		ShowGrenade(true);
 	}
+	Grenades = FMath::Clamp(Grenades - 1, 0, MaxGrenades);
+	UpdateGrenades();
 }
 
 void UCombatComponent::ServerReload_Implementation()
@@ -475,7 +545,7 @@ void UCombatComponent::InitWeaponAmmo()
 	for (int i = 0; i < MyEnum->NumEnums()-1; i++)
 	{
 		EWeaponType type = EWeaponType(MyEnum->GetValueByIndex(i));
-		CarriedAmmoMap.Emplace(type, InitialAmmoAmount);
+		CarriedAmmoMap.Emplace(type, 0);
 		UE_LOG(LogTemp, Error, TEXT("WeaponType = %s"), *EnumObj->GetDisplayNameTextByIndex(static_cast<uint8>(type)).ToString());
 	}
 	//CarriedAmmoMap.Emplace(EWeaponType::EWT_Shotgun, 2);
@@ -545,7 +615,15 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 	AttachActorToRightHand(EquippedWeapon);
 	EquippedWeapon->SetOwner(Character);
 	EquippedWeapon->ShowPickupWidget(false);
-	EquippedWeapon->SetHUDAmmo();
+	// 更新CarriedAmmo
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+	} else
+	{
+		CarriedAmmo = 0;
+	}
+	UpdateAmmoHUD();
 	
 	PlayEquipWeaponSound();
 	AutoReloadEmptyWeapon();
@@ -570,7 +648,7 @@ void UCombatComponent::FinishReloading()
 	if (Character->HasAuthority())
 	{
 		CombatState = ECombatState::ECS_UnOccupied;
-		UpdateAmmo();
+		ReloadAmmo();
 	}
 	// 换弹完成，仍按住了开火
 	if (bFireButtonPressed)
@@ -601,4 +679,33 @@ void UCombatComponent::ThrowGrenadeFinished()
 {
 	CombatState = ECombatState::ECS_UnOccupied;
 	AttachActorToRightHand(EquippedWeapon);
+}
+
+void UCombatComponent::LaunchGrenade()
+{
+	ShowGrenade(false);
+	if (Character && Character->IsLocallyControlled())
+	{
+		ServerLaunchGrenade(HitTarget);
+	}
+}
+
+void UCombatComponent::ServerLaunchGrenade_Implementation(const FVector_NetQuantize& Target)
+{
+	if (Character && Character->GetAttachedGrenade() && GrenadeClass)
+	{
+		const FVector LaunchLoaction = Character->GetAttachedGrenade()->GetComponentLocation();
+		FVector ToTarget = Target - LaunchLoaction;
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = Character;
+		SpawnParameters.Instigator = Character;
+		if (GetWorld())
+		{
+			GetWorld()->SpawnActor<AProjectile>(
+				GrenadeClass,
+				LaunchLoaction,
+				ToTarget.Rotation(),
+				SpawnParameters);
+		}
+	}
 }

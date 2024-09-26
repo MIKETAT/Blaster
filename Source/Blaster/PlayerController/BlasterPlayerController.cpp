@@ -1,12 +1,14 @@
 #include "BlasterPlayerController.h"
 
 #include "Blaster/BlasterGameState.h"
+#include "Blaster/BlasterComponent/CombatComponent.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/HUD/Announcement.h"
 #include "Blaster/HUD/BlasterHUD.h"
 #include "Blaster/HUD/CharacterOverlay.h"
 #include "Blaster/HUD/SniperScopeOverlayWidget.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Blaster/Weapon/Weapon.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Kismet/GameplayStatics.h"
@@ -69,6 +71,7 @@ void ABlasterPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	ServerCheckMatchState();
+	bInitialize = false;
 }
 
 void ABlasterPlayerController::Tick(float DeltaSeconds)
@@ -151,6 +154,19 @@ void ABlasterPlayerController::SetHUDAmmo(int32 Ammo, int32 CarriedAmmo)
 	{
 		FString AmmoText = FString::Printf(TEXT("Ammo:%d/%d"), Ammo, CarriedAmmo);
 		BlasterHUD->CharacterOverlay->AmmoAmount->SetText(FText::FromString(AmmoText));
+	}
+}
+
+void ABlasterPlayerController::SetHUDGrenades(int32 Grenades)
+{
+	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
+	bool bHUDValid = BlasterHUD &&
+		BlasterHUD->CharacterOverlay &&
+		BlasterHUD->CharacterOverlay->GrenadesAmount;
+	if (bHUDValid)
+	{
+		FString GrenadesAmount = FString::Printf(TEXT("%d"), Grenades);
+		BlasterHUD->CharacterOverlay->GrenadesAmount->SetText(FText::FromString(GrenadesAmount));
 	}
 }
 
@@ -398,13 +414,24 @@ FString ABlasterPlayerController::GetCurrentTopPlayerInfo()
 
 void ABlasterPlayerController::PollInit()
 {
-	if (!bInitialize)
+	if (bInitialize)					return;
+	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(GetPawn());
+	if (BlasterCharacter == nullptr || BlasterCharacter->GetCombat() == nullptr)			return;
+	ABlasterPlayerState* BlasterPlayerState = BlasterCharacter->GetBlasterPlayerState();
+	if (BlasterPlayerState == nullptr)	return;
+	SetHUDScore(BlasterPlayerState->GetScore());
+	SetHUDDefeats(BlasterPlayerState->GetPlayerDefeats());
+	AWeapon* EquippedWeapon = BlasterCharacter->GetEquippedWeapon();
+	if (EquippedWeapon)
 	{
-		if (BlasterHUD)
-		{
-			bInitialize = BlasterHUD->AddAnnouncement();
-		}
+		SetHUDAmmo(EquippedWeapon->GetAmmo(), BlasterCharacter->GetCombat()->GetCarriedAmmo());	
+	} else
+	{
+		SetHUDAmmo(0, 0);
 	}
+	SetHUDHealth(BlasterCharacter->GetHealth(), BlasterCharacter->GetMaxHealth());
+	SetHUDGrenades(BlasterCharacter->GetCombat()->GetGrenades());
+	bInitialize = true;
 }
 
 void ABlasterPlayerController::OnRep_MatchState()

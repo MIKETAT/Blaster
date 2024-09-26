@@ -19,6 +19,8 @@ public:
 	void AddToDefeats(int32 DefeatsAmount);
 	void ScoreChange(float ScoreAmount);
 	void DefeatsChange(int32 DefeatsAmount);
+
+	FORCEINLINE int32 GetPlayerDefeats() const { return Defeats; }
 private:
 	UPROPERTY()
 	class ABlasterCharacter* Character;
