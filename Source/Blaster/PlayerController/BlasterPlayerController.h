@@ -19,6 +19,7 @@ public:
 	virtual void ReceivedPlayer() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void SetHUDHealth(float Health, float MaxHealth);
+	void SetHUDShield(float Shield, float MaxShield);
 	void SetHUDScore(float Score);
 	void SetHUDDefeats(int32 Defeats);
 	void SetHUDAmmo(int32 Ammo, int32 CarriedAmmo);
@@ -42,7 +43,6 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ReportServerTime(float ClientRequestTime, float ServerReceivedRequestTime);
 
-	// todo 倒计时不准的问题，为什么都是在server端的调用  网络游戏的调试问题
 	UFUNCTION(Server, Reliable)
 	void ServerCheckMatchState();
 

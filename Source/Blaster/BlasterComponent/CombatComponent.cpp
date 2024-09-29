@@ -20,10 +20,8 @@
 UCombatComponent::UCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-
 	BaseWalkSpeed = 600.f;
 	AimWalkSpeed = 400.f;
-
 }
 
 void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -33,7 +31,7 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(UCombatComponent, bIsAiming);
 	DOREPLIFETIME(UCombatComponent, CombatState);
 	DOREPLIFETIME_CONDITION(UCombatComponent, CarriedAmmo, COND_OwnerOnly);	//只需要复制给持有者即可，无需复制给其他玩家，节省带宽
-	DOREPLIFETIME(UCombatComponent, Grenades);	// todo 是否可以使用DOREPLIFETIME_CONDITION
+	DOREPLIFETIME_CONDITION(UCombatComponent, Grenades, COND_OwnerOnly);	
 	// todo condition用法详解
 }
 
@@ -53,6 +51,7 @@ void UCombatComponent::BeginPlay()
 	{
 		InitWeaponAmmo();
 	}
+	SpawnDefaultWeapon();
 }
 
 void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -245,7 +244,6 @@ void UCombatComponent::UpdateAmmoHUD()
 
 // on server
 // reload the ammo
-// todo 不同子弹类型不应该使用同一个carriedAmmo, 后续到pickup时解决这个问题
 void UCombatComponent::ReloadAmmo()
 {
 	if (Character == nullptr || EquippedWeapon == nullptr)	return;
@@ -299,7 +297,7 @@ void UCombatComponent::UpdateShotgunAmmoValues()
 	if (Character == nullptr || EquippedWeapon == nullptr)	return;
 	for (const auto& it : CarriedAmmoMap)
 	{
-		UE_LOG(LogTemp, Error, TEXT("WeaponType = %d, Ammo = %d"), it.Key, it.Value);
+		//UE_LOG(LogTemp, Error, TEXT("WeaponType = %d, Ammo = %d"), it.Key, it.Value);
 	}
 	
 	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
@@ -348,7 +346,7 @@ void UCombatComponent::ThrowGrenade()
 	if (Grenades == 0)	return;	// todo if on clinet, what if client is cheating 
 	
 	// todo 没有武器时是否可以扔雷
-	if (CombatState != ECombatState::ECS_UnOccupied || !Character || EquippedWeapon == nullptr)	return;
+	if (CombatState != ECombatState::ECS_UnOccupied || !Character)	return;
 	CombatState = ECombatState::ECS_ThrowingGrenade;
 	Character->PlayThrowGrenadeMontage();
 	AttachActorToLeftHand(EquippedWeapon);
@@ -515,7 +513,6 @@ void UCombatComponent::InterpFOV(float DeltaTime)
 void UCombatComponent::OnRep_EquippedWeapon()
 {
 	UE_LOG(LogTemp, Error, TEXT("OnRep_EquippedWeapon"));
-	UE_LOG(LogTemp, Error, TEXT("EquippedWeapon Changed"));
 	if (Character && EquippedWeapon)
 	{
 		// TODO 为什么下面这段不加上，client依然可以执行捡起武器。
@@ -534,8 +531,7 @@ void UCombatComponent::OnRep_EquippedWeapon()
 	}
 }
 
-// todo 是否要设置初始自身携带弹药
-// todo 是否可以根据enum WeaponType 遍历这些类，得到每种武器的最大弹容量，作为初始值初始化
+// 初始化CarriedAmmoMap
 void UCombatComponent::InitWeaponAmmo()
 {
 	const UEnum* EnumObj = FindObject<UEnum>(ANY_PACKAGE, TEXT("EWeaponType"), true);
@@ -546,9 +542,19 @@ void UCombatComponent::InitWeaponAmmo()
 	{
 		EWeaponType type = EWeaponType(MyEnum->GetValueByIndex(i));
 		CarriedAmmoMap.Emplace(type, 0);
-		UE_LOG(LogTemp, Error, TEXT("WeaponType = %s"), *EnumObj->GetDisplayNameTextByIndex(static_cast<uint8>(type)).ToString());
+		//UE_LOG(LogTemp, Error, TEXT("WeaponType = %s"), *EnumObj->GetDisplayNameTextByIndex(static_cast<uint8>(type)).ToString());
 	}
 	//CarriedAmmoMap.Emplace(EWeaponType::EWT_Shotgun, 2);
+}
+
+void UCombatComponent::SpawnDefaultWeapon()
+{
+	ABlasterGameMode* BlasterGameMode = Cast<ABlasterGameMode>(UGameplayStatics::GetGameMode(this));
+	UWorld* World = GetWorld();
+	if (!BlasterGameMode || !World || !Character || !Character->GetCombat())	return;
+	AWeapon* DefaultWeapon = World->SpawnActor<AWeapon>(DefaultWeaponClass);
+	Character->GetCombat()->EquipWeapon(DefaultWeapon);
+	DefaultWeapon->SetIsDefaultWeapon(true);
 }
 
 void UCombatComponent::DropEquippedWeapon()
@@ -624,7 +630,6 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 		CarriedAmmo = 0;
 	}
 	UpdateAmmoHUD();
-	
 	PlayEquipWeaponSound();
 	AutoReloadEmptyWeapon();
 	

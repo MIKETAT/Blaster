@@ -96,6 +96,9 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	AWeapon* EquippedWeapon;
 
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AWeapon> DefaultWeaponClass;
+	
 	UPROPERTY(Replicated)
 	bool bIsAiming;
 
@@ -133,6 +136,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_CombatState();
+	
+	UFUNCTION()
+	void OnRep_EquippedWeapon();
 
 	TMap<EWeaponType, int32> CarriedAmmoMap;
 	/***
@@ -161,11 +167,8 @@ private:
 	float ZoomInterpSpeed = 20.f;
 
 	void InterpFOV(float DeltaTime);
-	
-	UFUNCTION()
-	void OnRep_EquippedWeapon();
-
 	void InitWeaponAmmo();
+	void SpawnDefaultWeapon();
 	void DropEquippedWeapon();
 	void AttachActorToRightHand(AActor* ActorToAttach);
 	void AttachActorToLeftHand(AActor* ActorToAttach);

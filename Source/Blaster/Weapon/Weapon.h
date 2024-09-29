@@ -41,6 +41,8 @@ public:
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE bool IsEmpty() const { return Ammo == 0; }
 	FORCEINLINE bool IsFull() const { return Ammo == MaxCapacity; }
+	FORCEINLINE bool IsDefaultWeapon () const { return bIsDefaultWeapon; }
+	FORCEINLINE void SetIsDefaultWeapon(bool IsDefault) { bIsDefaultWeapon = IsDefault; }
 	FORCEINLINE int32 GetMaxCapacity() const { return MaxCapacity; }
 	void SetWeaponFireStatus(bool CanFire);
 	FORCEINLINE FTimerHandle& GetFireTimer() { return FireTimer; }
@@ -161,4 +163,7 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* OutOfAmmoSound;
+
+private:
+	bool bIsDefaultWeapon = false;		// 如果是自带的武器，角色携带其死亡时销毁
 };

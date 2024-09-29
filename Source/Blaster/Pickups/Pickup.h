@@ -42,4 +42,15 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	float RotateRate = 45.f;
+	
+	UPROPERTY(EditAnywhere)
+	class UNiagaraComponent* PickupEffectComponent;
+	// todo UNiagaraComponent 和  UNiagaraSystem 的联系和使用
+	
+	UPROPERTY(EditAnywhere)
+	class UNiagaraSystem* PickupEffect;
+
+	FTimerHandle BindOverlapTimer;
+	float BindOverlapTime = .25f;
+	void BindOverlapTimerFinish();
 };

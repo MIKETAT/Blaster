@@ -3,6 +3,8 @@
 
 #include "Pickup.h"
 
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Blaster/Weapon/WeaponTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
@@ -16,9 +18,23 @@ APickup::APickup()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	OverlapSphere = CreateDefaultSubobject<USphereComponent>(TEXT("OverlapSphere"));
 	OverlapSphere->SetupAttachment(RootComponent);
+	OverlapSphere->SetSphereRadius(150.f);
+	OverlapSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	OverlapSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+	OverlapSphere->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	
 	PickupMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PickupMesh"));
 	PickupMesh->SetupAttachment(OverlapSphere);
 	PickupMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_PURPLE);
+	PickupMesh->AddLocalOffset(FVector(0.f, 0.f, 90.f));
+	PickupMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	PickupMesh->SetRelativeScale3D(FVector(3.f, 3.f, 3.f));
+	PickupMesh->SetRenderCustomDepth(true);
+	PickupMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_PURPLE);
+	
+	PickupEffectComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("PickupEffectComponent"));
+	PickupEffectComponent->SetupAttachment(RootComponent);
+
 }
 
 void APickup::BeginPlay()
@@ -26,23 +42,24 @@ void APickup::BeginPlay()
 	Super::BeginPlay();
 	if (HasAuthority())
 	{
-		OverlapSphere->OnComponentBeginOverlap.AddDynamic(this, &APickup::OnSphereOverlap);	
+		GetWorldTimerManager().SetTimer(
+			BindOverlapTimer,
+			this,
+			&APickup::BindOverlapTimerFinish,
+			BindOverlapTime);
 	}
-	OverlapSphere->SetSphereRadius(150.f);
-	OverlapSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	OverlapSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
-	OverlapSphere->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-	PickupMesh->AddLocalOffset(FVector(0.f, 0.f, 90.f));
-	PickupMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	PickupMesh->SetRelativeScale3D(FVector(3.f, 3.f, 3.f));
-	PickupMesh->SetRenderCustomDepth(true);
-	PickupMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_PURPLE);
+	
 }
 
 void APickup::OnSphereOverlap(UPrimitiveComponent* OverlapComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComponent, int32 OtherIndex, bool mFromSweep, const FHitResult& SweepHitResult)
 {
 	
+}
+
+void APickup::BindOverlapTimerFinish()
+{
+	OverlapSphere->OnComponentBeginOverlap.AddDynamic(this, &APickup::OnSphereOverlap);
 }
 
 void APickup::Tick(float DeltaTime)
@@ -62,6 +79,13 @@ void APickup::Destroyed()
 		UGameplayStatics::PlaySoundAtLocation(
 			this,
 			PickupSound,
+			GetActorLocation());
+	}
+	if (PickupEffect)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			PickupEffect,
 			GetActorLocation());
 	}
 }

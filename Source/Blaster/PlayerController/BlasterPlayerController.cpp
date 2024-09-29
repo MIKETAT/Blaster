@@ -17,13 +17,6 @@
 // client加入游戏时请求server的状态
 void ABlasterPlayerController::ServerCheckMatchState_Implementation()
 {
-	if (HasAuthority())
-	{
-		UE_LOG(LogTemp, Error, TEXT("Server"));
-	} else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Client"));
-	}
 	ABlasterGameMode* GameMode = Cast<ABlasterGameMode>(UGameplayStatics::GetGameMode(this));
 	if (GameMode)
 	{
@@ -32,10 +25,18 @@ void ABlasterPlayerController::ServerCheckMatchState_Implementation()
 		MatchTime = GameMode->MatchTime;
 		LevelStartTime = GameMode->LevelStartTime;
 		MatchState = GameMode->GetMatchState();
-		UE_LOG(LogTemp, Error, TEXT("in ServerCheckMatchState, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
+		ClientJoinGame(MatchState, MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
+	}
+	if (HasAuthority())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Server"));
+	} else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Client"));
+	}
+	//UE_LOG(LogTemp, Error, HasAuthority() ? TEXT("Server") : TEXT("Client"));
+	UE_LOG(LogTemp, Error, TEXT("in ServerCheckMatchState, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
 			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
-		ClientJoinGame_Implementation(MatchState, MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
-	} 
 }
 
 void ABlasterPlayerController::ClientJoinGame_Implementation(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime)
@@ -117,6 +118,19 @@ void ABlasterPlayerController::SetHUDHealth(float Health, float MaxHealth)
 	}
 }
 
+void ABlasterPlayerController::SetHUDShield(float Shield, float MaxShield)
+{
+	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
+	if (BlasterHUD && BlasterHUD->CharacterOverlay &&
+		BlasterHUD->CharacterOverlay->ShieldBar && BlasterHUD->CharacterOverlay->ShieldText)
+	{
+		const float ShieldPercent = Shield / MaxShield;
+		BlasterHUD->CharacterOverlay->ShieldBar->SetPercent(ShieldPercent);
+		FString ShieldText = FString::Printf(TEXT("%d/%d"), FMath::CeilToInt(Shield), FMath::CeilToInt(MaxShield));
+		BlasterHUD->CharacterOverlay->ShieldText->SetText(FText::FromString(ShieldText));
+	}
+}
+
 void ABlasterPlayerController::SetHUDScore(float Score)
 {
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
@@ -169,20 +183,6 @@ void ABlasterPlayerController::SetHUDGrenades(int32 Grenades)
 		BlasterHUD->CharacterOverlay->GrenadesAmount->SetText(FText::FromString(GrenadesAmount));
 	}
 }
-
-// todo Ammo/CarriedAmmo 使用同一个TextBlock实现
-/*void ABlasterPlayerController::SetHUDCarriedAmmo(int32 Ammo)
-{
-	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
-	bool bHUDValid = BlasterHUD &&
-		BlasterHUD->CharacterOverlay &&
-		BlasterHUD->CharacterOverlay->CarriedAmmoAmount;
-	if (bHUDValid)
-	{
-		FString CarriedAmmoText = FString::Printf(TEXT("Carried : %d"), Ammo);
-		BlasterHUD->CharacterOverlay->CarriedAmmoAmount->SetText(FText::FromString(CarriedAmmoText));
-	}
-}*/
 
 void ABlasterPlayerController::SetHUDCountDown(float CountDown)
 {
@@ -431,6 +431,7 @@ void ABlasterPlayerController::PollInit()
 	}
 	SetHUDHealth(BlasterCharacter->GetHealth(), BlasterCharacter->GetMaxHealth());
 	SetHUDGrenades(BlasterCharacter->GetCombat()->GetGrenades());
+	// SetHUDShield()
 	bInitialize = true;
 }
 

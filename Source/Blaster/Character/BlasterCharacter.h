@@ -11,6 +11,7 @@
 #include "GameFramework/Character.h"
 #include "BlasterCharacter.generated.h"
 
+class UBuffComponent;
 class UCombatComponent;
 class ABlasterPlayerState;
 enum class ECombatState : uint8;
@@ -61,15 +62,21 @@ public:
 
 	FORCEINLINE bool IsElimmed() const { return bElimmed; }
 	FORCEINLINE float GetHealth() const { return Health; }
+	FORCEINLINE void SetHealth(float Amount) { Health = Amount; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
+	FORCEINLINE float GetShield() const { return Shield; }
+	FORCEINLINE void SetShield(float Amount) { Shield = Amount; }
+	FORCEINLINE float GetMaxShield() const { return MaxShield; }
 	FORCEINLINE ABlasterPlayerState* GetBlasterPlayerState() const { return BlasterPlayerState; }
 	FORCEINLINE UAnimMontage* GetReloadMontage() const { return ReloadMontage; }
 	FORCEINLINE UCombatComponent* GetCombat() const { return Combat; }
+	FORCEINLINE UBuffComponent* GetBuff() const { return Buff; }
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
 	ECombatState GetCombatState() const;
 	
 	float CalculateSpeed();
 	void UpdateHealthHUD();
+	void UpdateShieldHUD();
 	
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastElim();
@@ -90,6 +97,7 @@ protected:
 	void Turn(float Value);
 	void LookUp(float Value);
 	void EquipButtonPressed();
+	void DropButtonPressed();
 	void CrouchButtonPressed();
 	void AimButtonPressed();
 	void AimButtonReleased();
@@ -122,6 +130,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "ttrue"))
 	class UCombatComponent* Combat;
+	
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "ttrue"))
+	class UBuffComponent* Buff;
 
 	float AO_Yaw;
 	float InterpAO_Yaw;
@@ -169,6 +180,16 @@ private:
 	UPROPERTY(ReplicatedUsing= OnRep_Health, VisibleAnywhere, Category = "Player Status")
 	float Health = MaxHealth;
 
+	/**
+	 * Player Shield
+	 */
+
+	UPROPERTY(EditAnywhere, Category = "Player Status0")
+	float MaxShield = 100.f;
+
+	UPROPERTY(ReplicatedUsing= OnRep_Shield, EditAnywhere, Category= "Player Status")
+	float Shield = 0.f;
+	
 	bool bElimmed = false;
 
 	ABlasterPlayerController* BlasterPlayerController;
@@ -226,7 +247,10 @@ private:
 	void ElimTimerFinish();
 	
 	UFUNCTION()
-	void OnRep_Health();
+	void OnRep_Health(float LastHealth);
+
+	UFUNCTION()
+	void OnRep_Shield(float LastShield);
 	
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon* LastOverlapWeapon);
