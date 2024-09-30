@@ -72,7 +72,7 @@ void ABlasterHUD::ShowSniperScopeOverlay(bool bShowScope)
 void ABlasterHUD::DrawHUD()
 {
 	Super::DrawHUD();
-	if (GEngine)
+	if (GEngine && GetHUDCrosshairEnabled())
 	{
 		FVector2D ViewportSize;
 		GEngine->GameViewport->GetViewportSize(ViewportSize);

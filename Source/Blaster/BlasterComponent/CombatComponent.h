@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Blaster/BlasterTypes/CombatState.h"
+#include "Blaster/Character/BlasterCharacter.h"
 #include "Components/ActorComponent.h"
 #include "Blaster/HUD/BlasterHUD.h"
+#include "Blaster/Weapon/Weapon.h"
 #include "CombatComponent.generated.h"
 
 
@@ -26,6 +28,13 @@ public:
 	FORCEINLINE int32 GetCarriedAmmo() const { return CarriedAmmo; }
 	FORCEINLINE int32 GetGrenades() const { return Grenades; }
 	void EquipWeapon(class AWeapon* WeaponToEquipped);
+	void DropWeapon();
+	void EquipPrimitiveWeapon(AWeapon* WeaponToEquip);
+	void EquipSecondaryWeapon(AWeapon* WeaponToEquip);
+	bool ShouldSwapWeapon() const; // 返回此时是否可以切换武器 即 EquippedWeapon SecondaryWeapon均不为空且OverlappingWeapon为空
+		
+	void SwapWeapons();
+	
 	bool CanFire() const;
 	
 	void PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount);
@@ -96,6 +105,9 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	AWeapon* EquippedWeapon;
 
+	UPROPERTY(ReplicatedUsing = OnRep_SecondaryWeapon)
+	AWeapon* SecondaryWeapon;
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AWeapon> DefaultWeaponClass;
 	
@@ -138,7 +150,10 @@ private:
 	void OnRep_CombatState();
 	
 	UFUNCTION()
-	void OnRep_EquippedWeapon();
+	void OnRep_EquippedWeapon(AWeapon* LastWeapon);
+
+	UFUNCTION()
+	void OnRep_SecondaryWeapon();
 
 	TMap<EWeaponType, int32> CarriedAmmoMap;
 	/***
@@ -170,16 +185,17 @@ private:
 	void InitWeaponAmmo();
 	void SpawnDefaultWeapon();
 	void DropEquippedWeapon();
+	void DropOrDestroyWeapon(AWeapon* WeaponToHandle);
 	void AttachActorToRightHand(AActor* ActorToAttach);
 	void AttachActorToLeftHand(AActor* ActorToAttach);
-
+	void AttachActorToBackpack(AActor* ActorToAttach);
 	// update ammo and the hud
 	void ReloadAmmo();
 	void UpdateAmmoHUD();
 	void UpdateGrenades();
 
 	void HandleReload();
-	void PlayEquipWeaponSound();
+	void PlayEquipWeaponSound(AWeapon* WeaponToEquip);
 	void AutoReloadEmptyWeapon();
 	void UpdateShotgunAmmoValues();
 	

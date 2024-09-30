@@ -68,16 +68,23 @@ public:
 	void AddCharacterOverlay();
 	bool AddAnnouncement();
 	void ShowSniperScopeOverlay(bool bShowScope);
-	
+	FORCEINLINE void SetHUDCrosshairEnabled(bool bEnable) { bCrosshairEnabled = bEnable; }
+	FORCEINLINE bool GetHUDCrosshairEnabled() const { return bCrosshairEnabled; }
 protected:
 	virtual void BeginPlay() override;
 private:
 	FHUDPackage HUDPackage;
+
+	bool bCrosshairEnabled = false;
 
 	UPROPERTY(EditAnywhere)
 	float CrosshairSpreadMax = 15.f;
 	
 	void DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FVector2D Spread, FLinearColor CrosshairsColor);
 public:
-	FORCEINLINE void SetHUDPackage(const FHUDPackage& Package) { HUDPackage = Package; }
+	FORCEINLINE void SetHUDPackage(const FHUDPackage& Package)
+	{
+		HUDPackage = Package;
+		bCrosshairEnabled = true;
+	}
 };

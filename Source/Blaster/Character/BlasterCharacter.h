@@ -45,6 +45,7 @@ public:
 	void PlayElimMontage();
 	void PlayThrowGrenadeMontage();
 	FVector GetHitTarget() const;
+	FORCEINLINE AWeapon* GetOverlappingWeapon() const { return OverlappingWeapon; }
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
 	/* 由于Health已经是Replicated的(改变会自动调用OnRep_Health, 利用这点比发rpc更节省资源)
@@ -77,7 +78,8 @@ public:
 	float CalculateSpeed();
 	void UpdateHealthHUD();
 	void UpdateShieldHUD();
-	
+	void DropOrDestroyWeapons();
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastElim();
 

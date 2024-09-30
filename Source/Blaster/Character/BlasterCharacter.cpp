@@ -290,17 +290,18 @@ void ABlasterCharacter::UpdateShieldHUD()
 	}
 }
 
+void ABlasterCharacter::DropOrDestroyWeapons()
+{
+	if (Combat)
+	{
+		Combat->DropOrDestroyWeapon(Combat->EquippedWeapon);
+		Combat->DropOrDestroyWeapon(Combat->SecondaryWeapon);
+	}
+}
+
 void ABlasterCharacter::Elim()
 {
-	if (Combat && Combat->EquippedWeapon)
-	{
-		if (Combat->EquippedWeapon->IsDefaultWeapon())
-		{
-			Combat->EquippedWeapon->Destroy();	// 出生自带武器销毁
-		} else {
-			Combat->EquippedWeapon->Drop();
-		}
-	}
+	DropOrDestroyWeapons();
 	
 	MulticastElim();
 	// Set Elim Timer
@@ -473,26 +474,14 @@ void ABlasterCharacter::LookUp(float Value)
 
 void ABlasterCharacter::EquipButtonPressed()
 {
-	if (Combat)
-	{
-		if (HasAuthority())
-		{
-			Combat->EquipWeapon(OverlappingWeapon);	
-		} else
-		{
-			ServerEquipButtonPressed();
-		}
-	} else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Combat is null"));
-	}
+	ServerEquipButtonPressed();
 }
 
 void ABlasterCharacter::DropButtonPressed()
 {
 	if (Combat && Combat->EquippedWeapon)
 	{
-		Combat->EquippedWeapon->Drop();	
+		Combat->DropWeapon();
 	}
 }
 
@@ -666,17 +655,13 @@ void ABlasterCharacter::FireButtonPressed()
 	{
 		Combat->FireButtonPressed(true);
 	}
-	// debug delete in one sec
-	
+	/*// debug delete in one sec
 	AGameModeBase* mode = UGameplayStatics::GetGameMode(this);
 	if (GEngine && mode)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green,
 			FString::Printf(TEXT("GameMode is %s"), *mode->GetName()));
-	}
-
-
-	
+	}*/
 }
 
 void ABlasterCharacter::FireButtonReleased()
@@ -727,7 +712,11 @@ void ABlasterCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const 
 
 void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 {
-	if (Combat)
+	if (!Combat)	return;
+	if (Combat->ShouldSwapWeapon())
+	{
+		Combat->SwapWeapons();
+	} else if (OverlappingWeapon)
 	{
 		Combat->EquipWeapon(OverlappingWeapon);
 	}

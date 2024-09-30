@@ -93,12 +93,6 @@ void AWeapon::Fire(const FVector& HitTarget)
 	SpendRound();
 }
 
-// 设置武器是否可开火
-void AWeapon::SetWeaponFireStatus(bool CanFire)
-{
-	bCanFire = CanFire;
-}
-
 void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlapComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComponent, int32 OtherIndex, bool mFromSweep, const FHitResult& SweepHitResult)
 {
@@ -148,31 +142,59 @@ void AWeapon::SetWeaponPhysicsAndCollision(bool bEnable)
 	WeaponMesh->SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryAndPhysics :ECollisionEnabled::NoCollision);
 }
 
-void AWeapon::SetWeaponState(EWeaponState state)
+void AWeapon::OnEquip()
 {
-	WeaponState = state;
+	ShowPickupWidget(false);
+	// Disable Physics and Collision
+	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetWeaponPhysicsAndCollision(false);
+	EnableCustomDepth(false);
+}
+
+void AWeapon::OnDrop()
+{
+	SetWeaponPhysicsAndCollision(true);
+	if (HasAuthority())
+	{
+		AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);	
+	}
+	WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
+	WeaponMesh->MarkRenderStateDirty();	// force a refresh
+	EnableCustomDepth(true);
+}
+
+void AWeapon::OnEquipSecondary()
+{
+	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetWeaponPhysicsAndCollision(false);
+	WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
+	WeaponMesh->MarkRenderStateDirty();	// force a refresh
+	EnableCustomDepth(true);
+}
+
+
+void AWeapon::OnWeaponStateChange()
+{
 	switch (WeaponState)
 	{
 	case EWeaponState::EWS_Equipped:
-		ShowPickupWidget(false);
-		// Disable Physics and Collision
-		AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		SetWeaponPhysicsAndCollision(false);
-		EnableCustomDepth(false);
+		OnEquip();
 		break;
 	case EWeaponState::EWS_Dropped:
-		SetWeaponPhysicsAndCollision(true);
-		if (HasAuthority())
-		{
-			AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);	
-		}
-		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
-		WeaponMesh->MarkRenderStateDirty();	// force a refresh
-		EnableCustomDepth(true);
+		OnDrop();
+		break;
+	case EWeaponState::EWS_EquippedSecondary:
+		OnEquipSecondary();
 		break;
 	default:
 		break;		
 	}
+}
+
+void AWeapon::SetWeaponState(EWeaponState state)
+{
+	WeaponState = state;
+	OnWeaponStateChange();
 }
 
 /**
@@ -193,6 +215,13 @@ void AWeapon::OnRep_WeaponState()
 	case EWeaponState::EWS_Dropped:
 		SetWeaponPhysicsAndCollision(true);
 		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
+		WeaponMesh->MarkRenderStateDirty();	// force a refresh
+		EnableCustomDepth(true);
+		break;
+	case EWeaponState::EWS_EquippedSecondary:
+		AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		SetWeaponPhysicsAndCollision(false);
+		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
 		WeaponMesh->MarkRenderStateDirty();	// force a refresh
 		EnableCustomDepth(true);
 		break;

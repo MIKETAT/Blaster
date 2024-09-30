@@ -74,7 +74,7 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 
 void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 {
-	if (Character == nullptr || Character->Controller == nullptr)	return;
+	if (Character == nullptr || Character->Controller == nullptr || EquippedWeapon == nullptr)	return;
 	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
 	if (Controller)
 	{
@@ -174,7 +174,7 @@ void UCombatComponent::OnRep_CombatState()
 void UCombatComponent::FireButtonPressed(bool bPressed)
 {
 	bFireButtonPressed = bPressed;
-	if (bFireButtonPressed)
+	if (bFireButtonPressed && EquippedWeapon)
 	{
 		Fire();
 	}
@@ -192,7 +192,7 @@ void UCombatComponent::Fire()
 	}
 	if (!CanFire())		return;
 	// 开火
-	EquippedWeapon->bCanFire = true;
+	
 	EquippedWeapon->SetWeaponFireStatus(false);	// 开火执行时不能同时开火
 	ServerFire(HitTarget);
 	CrosshairShootingFactor = FMath::Max(CrosshairShootingFactor + 0.2f, 1.f);
@@ -510,10 +510,12 @@ void UCombatComponent::InterpFOV(float DeltaTime)
 /**
  * NetWork
  */
-void UCombatComponent::OnRep_EquippedWeapon()
+void UCombatComponent::OnRep_EquippedWeapon(AWeapon* LastWeapon)	// todo LastWeapon是否保留
 {
 	UE_LOG(LogTemp, Error, TEXT("OnRep_EquippedWeapon"));
-	if (Character && EquippedWeapon)
+	if (Character == nullptr)	return;
+	
+	if (EquippedWeapon)
 	{
 		// TODO 为什么下面这段不加上，client依然可以执行捡起武器。
 		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
@@ -527,7 +529,28 @@ void UCombatComponent::OnRep_EquippedWeapon()
 		{
 			Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 		}
-		PlayEquipWeaponSound();
+		PlayEquipWeaponSound(EquippedWeapon);
+	}
+	if (Character->IsLocallyControlled() && HUD)
+	{
+		HUD->SetHUDCrosshairEnabled(EquippedWeapon != nullptr);
+	}
+}
+
+void UCombatComponent::OnRep_SecondaryWeapon()
+{
+	if (Character && SecondaryWeapon)
+	{
+		SecondaryWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+		AttachActorToBackpack(SecondaryWeapon);
+		PlayEquipWeaponSound(EquippedWeapon);
+		Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
+		Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
+		if (SecondaryWeapon && SecondaryWeapon->GetWeaponMesh())
+		{
+			SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
+			SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();
+		}
 	}
 }
 
@@ -565,6 +588,17 @@ void UCombatComponent::DropEquippedWeapon()
 	}
 }
 
+void UCombatComponent::DropOrDestroyWeapon(AWeapon* WeaponToHandle)
+{
+	if (WeaponToHandle == nullptr)	return;
+	if (WeaponToHandle->IsDefaultWeapon())
+	{
+		WeaponToHandle->Destroy();	// 出生自带武器销毁
+	} else {
+		WeaponToHandle->Drop();
+	}
+}
+
 void UCombatComponent::AttachActorToRightHand(AActor* ActorToAttach)
 {
 	if (Character == nullptr || Character->GetMesh() == nullptr || ActorToAttach == nullptr)	return;
@@ -588,14 +622,24 @@ void UCombatComponent::AttachActorToLeftHand(AActor* ActorToAttach)
 	}
 }
 
-void UCombatComponent::PlayEquipWeaponSound()
+void UCombatComponent::AttachActorToBackpack(AActor* ActorToAttach)
 {
-	if (EquippedWeapon && EquippedWeapon->EquipSound)
+	if (Character == nullptr || Character->GetMesh() == nullptr || ActorToAttach == nullptr)	return;
+	const USkeletalMeshSocket* BackpackSocket = Character->GetMesh()->GetSocketByName(FName("BackpackSocket"));
+	if (BackpackSocket)
+	{
+		BackpackSocket->AttachActor(ActorToAttach, Character->GetMesh());
+	}
+}
+
+void UCombatComponent::PlayEquipWeaponSound(AWeapon* WeaponToEquip)
+{
+	if (WeaponToEquip && WeaponToEquip->EquipSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(
 			this,
-			EquippedWeapon->EquipSound,
-			EquippedWeapon->GetActorLocation()
+			WeaponToEquip->EquipSound,
+			WeaponToEquip->GetActorLocation()
 		);
 	}
 }
@@ -613,9 +657,39 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 {
 	if (!Character || !WeaponToEquipped)				return;
 	if (CombatState != ECombatState::ECS_UnOccupied)	return;
-	
+
+	if (EquippedWeapon != nullptr && SecondaryWeapon == nullptr)
+	{
+		EquipSecondaryWeapon(WeaponToEquipped);
+	} else
+	{
+		EquipPrimitiveWeapon(WeaponToEquipped);
+	}
+	Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
+	Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
+}
+
+void UCombatComponent::DropWeapon()
+{
+	if (!EquippedWeapon)	return;
+	if (SecondaryWeapon)
+	{
+		SwapWeapons();
+		SecondaryWeapon->Drop();
+		SecondaryWeapon = nullptr;
+	} else
+	{
+		EquippedWeapon->Drop();
+		EquippedWeapon = nullptr;
+		HUD->SetHUDCrosshairEnabled(false);
+	}
+}
+
+void UCombatComponent::EquipPrimitiveWeapon(AWeapon* WeaponToEquip)
+{
+	if (WeaponToEquip == nullptr)	return;
 	DropEquippedWeapon();
-	EquippedWeapon = WeaponToEquipped;
+	EquippedWeapon = WeaponToEquip;
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 	
 	AttachActorToRightHand(EquippedWeapon);
@@ -630,17 +704,58 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 		CarriedAmmo = 0;
 	}
 	UpdateAmmoHUD();
-	PlayEquipWeaponSound();
+	PlayEquipWeaponSound(EquippedWeapon);
 	AutoReloadEmptyWeapon();
-	
-	Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
-	Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
+}
+
+void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
+{
+	if (WeaponToEquip == nullptr)	return;
+
+	SecondaryWeapon = WeaponToEquip;
+	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
+	AttachActorToBackpack(SecondaryWeapon);
+	PlayEquipWeaponSound(SecondaryWeapon);
+	SecondaryWeapon->SetOwner(Character);
+	if (SecondaryWeapon->GetWeaponMesh())
+	{
+		SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
+		SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();	// todo 研究一下
+	}
+}
+
+bool UCombatComponent::ShouldSwapWeapon() const
+{
+	{
+		return	Character && !Character->GetOverlappingWeapon() &&
+				EquippedWeapon && SecondaryWeapon &&
+				EquippedWeapon->CanFire();
+	}
+}
+
+void UCombatComponent::SwapWeapons()
+{
+	if (!EquippedWeapon)	return;
+	AWeapon* TempWeapon = EquippedWeapon;
+	EquippedWeapon = SecondaryWeapon;
+	AttachActorToRightHand(EquippedWeapon);
+	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	SecondaryWeapon = TempWeapon;
+	AttachActorToBackpack(SecondaryWeapon);
+	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
+	PlayEquipWeaponSound(EquippedWeapon);
+	UpdateAmmoHUD();
 }
 
 bool UCombatComponent::CanFire() const
 {
 	// 无武器 || 武器无法开火(此刻不能开火/没子弹) || 当前状态不能开火
-	if (EquippedWeapon == nullptr || !EquippedWeapon->CanFire())	return false;
+	if (EquippedWeapon == nullptr || !EquippedWeapon->CanFire())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Black,
+			FString::Printf(TEXT("EquippedWeapon is %d  and EquippedWeapon->CanFire is %d"), EquippedWeapon == nullptr, EquippedWeapon->CanFire()));
+		return false;
+	}
 	// shotgun在换弹时也可开火
 	if (EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun && CombatState == ECombatState::ECS_Reloading)	return true;
 	return CombatState == ECombatState::ECS_UnOccupied;

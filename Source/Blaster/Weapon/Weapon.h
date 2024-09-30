@@ -16,6 +16,7 @@ enum class EWeaponState : uint8
 {
 	EWS_Initial UMETA(DisplayName = "Initial State"),
 	EWS_Equipped UMETA(DisplayName = "Equipped"),
+	EWS_EquippedSecondary UMETA(DisplayName = "Equipped Secondary"),
 	EWS_Dropped UMETA(DisplayName = "Dropped"),
 	EWS_Default_MAX UMETA(DisplayName = "DefaultMAX")
 };
@@ -29,14 +30,13 @@ public:
 	AWeapon();
 	virtual void Tick(float DeltaTime) override;
 	void ShowPickupWidget(bool bShowWidget);
-	void SetWeaponState(EWeaponState state);
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 	virtual void Fire(const FVector& HitTarget);
 	FORCEINLINE float GetZoomedFOV() const { return ZoomedFOV; }
 	FORCEINLINE float GetZoomInterpSpeed() const { return ZoomInterSpeed; }
 	FORCEINLINE bool CanAutomaticFire() const { return bAutomaticFire; }
-	FORCEINLINE bool CanFire() const { return bCanFire && Ammo > 0; }	// 这里我把CanFire变量设置为Weapon的成员，感觉更合理
+	FORCEINLINE bool CanFire() const{ return bCanFire && Ammo > 0; }	// 这里我把CanFire变量设置为Weapon的成员，感觉更合理
 	FORCEINLINE float GetFireDelay() const { return FireDelay; }
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE bool IsEmpty() const { return Ammo == 0; }
@@ -44,12 +44,20 @@ public:
 	FORCEINLINE bool IsDefaultWeapon () const { return bIsDefaultWeapon; }
 	FORCEINLINE void SetIsDefaultWeapon(bool IsDefault) { bIsDefaultWeapon = IsDefault; }
 	FORCEINLINE int32 GetMaxCapacity() const { return MaxCapacity; }
-	void SetWeaponFireStatus(bool CanFire);
+	FORCEINLINE void SetWeaponFireStatus(bool CanFire) { bCanFire = CanFire; }
 	FORCEINLINE FTimerHandle& GetFireTimer() { return FireTimer; }
 	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
 	void Drop();
 	void SetWeaponPhysicsAndCollision(bool bEnable);
 
+	
+	void SetWeaponState(EWeaponState state);
+	FORCEINLINE EWeaponState GetWeaponState() const { return WeaponState; }
+	void OnWeaponStateChange();
+	void OnEquip();
+	void OnDrop();
+	void OnEquipSecondary();
+	
 	UFUNCTION()
 	void OnRep_Ammo();
 	virtual void OnRep_Owner() override;
