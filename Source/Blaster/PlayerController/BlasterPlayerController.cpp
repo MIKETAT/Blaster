@@ -6,6 +6,7 @@
 #include "Blaster/HUD/Announcement.h"
 #include "Blaster/HUD/BlasterHUD.h"
 #include "Blaster/HUD/CharacterOverlay.h"
+#include "Blaster/HUD/ReturnToMainMenu.h"
 #include "Blaster/HUD/SniperScopeOverlayWidget.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "Blaster/Weapon/Weapon.h"
@@ -68,11 +69,52 @@ float ABlasterPlayerController::GetServerTime()
 	return GetWorld()->GetTimeSeconds() + ServerClientDelta;
 }
 
+void ABlasterPlayerController::BroadcastElim(const FString& AttackerName, const FString& VictimName)
+{
+	ClientElimAnnouncement(AttackerName, VictimName);
+}
+
+void ABlasterPlayerController::ClientElimAnnouncement_Implementation(const FString& AttackerName, const FString& VictimName)
+{
+	// todo: Attacker Victim Self 三者的关系影响输出文本
+	if (BlasterHUD)
+	{
+		BlasterHUD->AddElimAnnouncement(AttackerName, VictimName);
+	}
+}
+
 void ABlasterPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	ServerCheckMatchState();
 	bInitialize = false;
+}
+
+void ABlasterPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+	if (InputComponent == nullptr)	return;
+	InputComponent->BindAction(TEXT("Quit"), IE_Pressed, this, &ABlasterPlayerController::ShowReturnToMainMenu);
+}
+
+void ABlasterPlayerController::ShowReturnToMainMenu()
+{
+	if (ReturnToMainMenuClass == nullptr)	return;
+	if (MainMenuWidget == nullptr)
+	{
+		MainMenuWidget = CreateWidget<UReturnToMainMenu>(this, ReturnToMainMenuClass);
+	}
+	if (MainMenuWidget)
+	{
+		bReturnToMainMenuOpen = !bReturnToMainMenuOpen;
+		if (bReturnToMainMenuOpen)
+		{
+			MainMenuWidget->MenuSetup();
+		} else
+		{
+			MainMenuWidget->MenuTearDown();
+		}
+	}
 }
 
 void ABlasterPlayerController::Tick(float DeltaSeconds)
@@ -139,7 +181,7 @@ void ABlasterPlayerController::SetHUDScore(float Score)
 		BlasterHUD->CharacterOverlay->ScoreAmount;
 	if (bHUDValid)
 	{
-		FString ScoreText = FString::Printf(TEXT("Score: %d"), FMath::FloorToInt(Score));
+		FString ScoreText = FString::Printf(TEXT("%d"), FMath::FloorToInt(Score));
 		BlasterHUD->CharacterOverlay->ScoreAmount->SetText(FText::FromString(ScoreText));
 	}
 }
@@ -152,7 +194,7 @@ void ABlasterPlayerController::SetHUDDefeats(int32 Defeats)
 		BlasterHUD->CharacterOverlay->DefeatsAmount;
 	if (bHUDValid)
 	{
-		FString DefeatsText = FString::Printf(TEXT("Defeats: %d"), Defeats);
+		FString DefeatsText = FString::Printf(TEXT("%d"), Defeats);
 		BlasterHUD->CharacterOverlay->DefeatsAmount->SetText(FText::FromString(DefeatsText));
 	}
 }

@@ -24,4 +24,7 @@ protected:
 private:
 	UPROPERTY(EditAnywhere)
 	USoundCue* BounceSound;
+
+	UPROPERTY(EditAnywhere)
+	class USphereComponent* CollisionShpere;
 };

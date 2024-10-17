@@ -5,6 +5,7 @@
 
 #include "WeaponTypes.h"
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Blaster/Utils/DebugUtil.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -28,11 +29,13 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 		FHitResult HitResult;
 		UWorld* World = GetWorld();
 		if (!World)		return;
-		World->LineTraceSingleByChannel(
+		/*World->LineTraceSingleByChannel(
 			HitResult,
 			Start,
 			End,
-			ECC_Visibility);
+			ECC_Visibility);*/
+		WeaponHit(Start, End, HitResult);
+		DebugUtil::PrintMsg(HitResult.BoneName, FColor::Blue);
 		if (HitResult.bBlockingHit)
 		{
 			// 命中人物
@@ -40,9 +43,10 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 			// On SimulateProxy 上 Controller为nullptr， 只在ApplyDamage上进行检查
 			if (BlasterCharacter && HasAuthority() && InstigatorController)
 			{
+				float DamageToCause = HitResult.BoneName == FString("head") ? HeadShotDamage : Damage;
 				UGameplayStatics::ApplyDamage(
 					BlasterCharacter,
-					Damage,
+					DamageToCause,
 					InstigatorController,
 					this,
 					UDamageType::StaticClass());	
@@ -55,7 +59,6 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					HitResult.ImpactPoint,
 					HitResult.ImpactNormal.Rotation());
 			}
-
 			if (HitSound)
 			{
 				UGameplayStatics::PlaySoundAtLocation(
@@ -63,6 +66,9 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					HitSound,
 					HitResult.ImpactPoint);
 			}
+		} else
+		{
+			// 
 		}
 		
 		// 没击中也要有SmokeTrail
@@ -103,27 +109,12 @@ FVector AHitScanWeapon::TraceEndWithScatter(const FVector& TraceStart, const FVe
 	FVector RandomVec = UKismetMathLibrary::RandomUnitVector() * FMath::RandRange(0.f, SphereRadius);
 	FVector RandomEnd = SphereCenter + RandomVec;
 	FVector ToTraceEnd = RandomEnd - TraceStart;
-	
-	/*DrawDebugSphere(
-		GetWorld(),
-		SphereCenter,
-		SphereRadius,
-		10,
-		FColor::Orange,
-		true);
-
-	DrawDebugSphere(
-		GetWorld(),
-		RandomEnd,
-		SphereRadius * 0.1,
-		10,
-		FColor::Red,
-		true);*/
 	return FVector(TraceStart + TRACE_LENGTH * ToTraceEnd / ToTraceEnd.Size());
 }
 
 void AHitScanWeapon::WeaponHit(const FVector& Start, const FVector& HitTarget, FHitResult& OutHit)
 {
+	DrawDebugPoint(GetWorld(), Start, 9.f, FColor::Purple, true);
 	FVector End = bUseScatter ? TraceEndWithScatter(Start, HitTarget) :  Start + (HitTarget - Start) * 1.25f;
 	UWorld* World = GetWorld();
 	if (World == nullptr)		return;

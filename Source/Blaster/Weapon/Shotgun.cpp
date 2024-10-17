@@ -24,35 +24,40 @@ void AShotgun::Fire(const FVector& HitTarget)
 		UWorld* World = GetWorld();
 		if (World == nullptr)	return;
 
-		TMap<ABlasterCharacter*, uint32> HitActor;
+		TMap<ABlasterCharacter*, uint32> HitMap;
+		TMap<ABlasterCharacter*, uint32> HeadShotHitMap;
+		TMap<ABlasterCharacter*, float> DamageMap;
+		
 		for (uint32 i = 0; i < NumberOfPellets; i++)
 		{
-			FVector EndLoc = TraceEndWithScatter(Start, HitTarget);
-			/*DrawDebugLine(
-				GetWorld(),
-				Start,
-				EndLoc,
-				FColor::Red,
-				true);*/
-			// GetHitResult
 			FHitResult HitResult;
 			WeaponHit(Start, HitTarget, HitResult);
 			ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(HitResult.GetActor());
 			if (BlasterCharacter == nullptr)	continue;
-			if (HitActor.Contains(BlasterCharacter))
+			if (HitResult.BoneName == FString("head"))
 			{
-				HitActor[BlasterCharacter]++;
+				if (HeadShotHitMap.Contains(BlasterCharacter))	HeadShotHitMap[BlasterCharacter]++;
+				else HeadShotHitMap.Emplace(BlasterCharacter, 1);
 			} else
 			{
-				HitActor.Emplace(BlasterCharacter, 1);
+				if (HitMap.Contains(BlasterCharacter))	HitMap[BlasterCharacter]++;
+				else HitMap.Emplace(BlasterCharacter, 1);
 			}
 		}
 
-		for (auto HitPair : HitActor)
+		for (auto Pair : HitMap)
 		{
-			if (InstigatorController && HasAuthority() && BlasterController)
+			DamageMap[Pair.Key] += Damage * Pair.Value;
+		}
+		for (auto Pair : HeadShotHitMap)
+		{
+			DamageMap[Pair.Key] += HeadShotDamage * Pair.Value;
+		}
+		if (InstigatorController && HasAuthority() && BlasterController)
+		{
+			for (auto Pair : DamageMap)
 			{
-				UGameplayStatics::ApplyDamage(HitPair.Key, Damage * HitPair.Value, InstigatorController, this, UDamageType::StaticClass());
+				UGameplayStatics::ApplyDamage(Pair.Key, Pair.Value, InstigatorController, this, UDamageType::StaticClass());
 			}
 		}
 	}

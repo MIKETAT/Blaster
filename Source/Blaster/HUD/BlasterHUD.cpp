@@ -5,6 +5,7 @@
 
 #include "Announcement.h"
 #include "CharacterOverlay.h"
+#include "Blaster/HUD/ElimAnnouncement.h"
 #include "Blueprint/UserWidget.h"
 #include "SniperScopeOverlayWidget.h"
 #include "Kismet/GameplayStatics.h"
@@ -29,6 +30,15 @@ void ABlasterHUD::BeginPlay()
 	}
 }
 
+void ABlasterHUD::ElimAnnouncementTimerFinished(UElimAnnouncement* MsgToRemove)
+{
+	if (MsgToRemove)
+	{
+		MsgToRemove->RemoveFromParent();
+		MsgToRemove->ClearElimMessage();
+	}
+}
+
 // todo 变量初始化时机，有更合适的实现吗
 void ABlasterHUD::AddCharacterOverlay()
 {
@@ -50,6 +60,34 @@ bool ABlasterHUD::AddAnnouncement()
 		return true;
 	}
 	return false;
+}
+
+void ABlasterHUD::AddElimAnnouncement(const FString& Attacker, const FString& Victim)
+{
+	if (!ElimAnnouncementClass)	return;
+	OwningController = OwningController == nullptr ? GetOwningPlayerController() : OwningController;
+	if (!ElimAnnouncement)
+	{
+		ElimAnnouncement = CreateWidget<UElimAnnouncement>(OwningController, ElimAnnouncementClass);	
+	}
+	if (ElimAnnouncement)
+	{
+		ElimAnnouncement->AddElimMessage(Attacker, Victim);
+		ElimAnnouncementDelegate.BindUFunction(this, FName("ElimAnnouncementTimerFinished"), ElimAnnouncement);
+		if (GetWorldTimerManager().IsTimerActive(ElimAnnouncementHandle))
+		{
+			GetWorldTimerManager().ClearTimer(ElimAnnouncementHandle);	// reset
+		}
+		GetWorldTimerManager().SetTimer(
+			ElimAnnouncementHandle,
+			ElimAnnouncementDelegate,
+			ElimAnnouncementExistTime,
+			false);
+		if (!ElimAnnouncement->IsInViewport())
+		{
+			ElimAnnouncement->AddToViewport();	
+		}
+	}
 }
 
 void ABlasterHUD::ShowSniperScopeOverlay(bool bShowScope)

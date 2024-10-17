@@ -34,6 +34,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Speed = Velocity.Size();
 
 	bIsInAir = BlasterCharacter->GetCharacterMovement()->IsFalling();
+	bIsHovering = BlasterCharacter->IsHovering();
 	bRotateRootBone = BlasterCharacter->ShouldRotateRootBone();
 	bIsAccelerating = BlasterCharacter->GetCharacterMovement()->GetCurrentAcceleration().Size() > 0.f;
 	bWeaponEquipped = BlasterCharacter->isWeaponEquipped();

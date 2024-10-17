@@ -3,6 +3,7 @@
 
 #include "ProjectileGrenade.h"
 
+#include "Blaster/Utils/DebugUtil.h"
 #include "Components/BoxComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -37,6 +38,11 @@ void AProjectileGrenade::BeginPlay()
 
 void AProjectileGrenade::OnBounce(const FHitResult& ImpactResult, const FVector& ImpactVelocity)
 {
+	
+	DebugUtil::PrintMsg(ImpactResult.BoneName, FColor::Red);
+	DebugUtil::LogMsg(ImpactResult.BoneName);
+
+	
 	if (BounceSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(

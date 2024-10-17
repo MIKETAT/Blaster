@@ -6,9 +6,6 @@
 #include "GameFramework/GameState.h"
 #include "BlasterGameState.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class BLASTER_API ABlasterGameState : public AGameState
 {
@@ -23,8 +20,10 @@ public:
 	void OnRep_TopScorePlayer();
 
 	void UpdateTopScorePlayer(ABlasterPlayerState* Character);
+
+	FORCEINLINE int32 GetTopScore() const { return TopScore; }
 protected:
 
 private:
-	uint32 TopScore;
+	int32 TopScore;
 };

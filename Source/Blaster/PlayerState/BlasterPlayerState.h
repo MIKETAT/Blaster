@@ -21,10 +21,11 @@ public:
 	void DefeatsChange(int32 DefeatsAmount);
 
 	FORCEINLINE int32 GetPlayerDefeats() const { return Defeats; }
+	//FORCEINLINE ABlasterCharacter* GetBlasterCharacter() const { return  Character == nullptr ? Cast<ABlasterCharacter>(GetPawn()) : Character; }
 private:
 	UPROPERTY()
 	class ABlasterCharacter* Character;
-
+	
 	UPROPERTY()
 	class ABlasterPlayerController* Controller;
 

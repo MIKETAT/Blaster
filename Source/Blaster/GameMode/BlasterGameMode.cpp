@@ -87,6 +87,27 @@ void ABlasterGameMode::Tick(float DeltaSeconds)
 	}
 }
 
+void ABlasterGameMode::PlayerLeftGame(ABlasterPlayerState* LeavingPlayerState)
+{
+	if (LeavingPlayerState == nullptr)	return;
+	ABlasterGameState* BlasterGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
+	if (BlasterGameState && BlasterGameState->TopScorePlayer.Contains(LeavingPlayerState))
+	{
+		BlasterGameState->TopScorePlayer.Remove(LeavingPlayerState);
+		// todo maybe refresh
+	}
+	if (ABlasterCharacter* LeavingPlayer = Cast<ABlasterCharacter>(LeavingPlayerState->GetPawn()))
+	{
+		LeavingPlayer->Elim(true);
+	}
+}
+
+bool ABlasterGameMode::ShouldEndGame()
+{
+	ABlasterGameState* BlasterGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
+	return BlasterGameState && BlasterGameState->GetTopScore() >= FullScore; 
+}
+
 void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
                                         ABlasterPlayerController* VictimController, ABlasterPlayerController* AttackerController)
 {
@@ -98,14 +119,57 @@ void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 	{
 		AttackerState->AddToScore(1.f);
 		VictimState->AddToDefeats(1);
+		// todo: 如何拷贝一个已有的TArray,类似STL的拷贝构造
+		TArray<ABlasterPlayerState*> CurrentTopPlayer;
+		for (auto it : BlasterGameState->TopScorePlayer)
+		{
+			CurrentTopPlayer.Emplace(it);
+		}
 		BlasterGameState->UpdateTopScorePlayer(AttackerState);
+		// Gain The Lead
+		for (auto it : BlasterGameState->TopScorePlayer)
+		{
+			ABlasterCharacter* Leader = Cast<ABlasterCharacter>(it->GetPawn());
+			if (Leader)
+			{
+				Leader->MulticastGainTheLead();
+			}
+		}
+		
+		// Lost The Lead
+		for (auto i = 0; i < CurrentTopPlayer.Num(); i++)
+		{
+			if (!BlasterGameState->TopScorePlayer.Contains(CurrentTopPlayer[i]))
+			{
+				ABlasterCharacter* Loser = Cast<ABlasterCharacter>(CurrentTopPlayer[i]->GetPawn());
+				if (Loser)
+				{
+					Loser->MulticastLostTheLead();
+				}
+			}
+		}
 	}
 	// Elim character
 	if (EliminatedCharacter)
 	{
-		EliminatedCharacter->Elim();
+		EliminatedCharacter->Elim(false);
 		UE_LOG(LogTemp, Error, TEXT("%s is Ellimmed"), *EliminatedCharacter->GetName());
 	}
+	UWorld* World = GetWorld();
+	if (!World)	return;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; It++)
+	{
+		ABlasterPlayerController* BlasterPlayerController = Cast<ABlasterPlayerController>(*It);
+		if (BlasterPlayerController)
+		{
+			BlasterPlayerController->BroadcastElim(AttackerState->GetName(), VictimState->GetName());
+		}
+	}
+	if (BlasterGameState && ShouldEndGame())
+	{
+		RestartGame();	// todo Announce  这个条件 FullScore应该放在GameState里吗
+	}
+	
 }
 
 void ABlasterGameMode::RequestRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController)

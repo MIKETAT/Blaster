@@ -3,9 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "GameFramework/GameMode.h"
 #include "BlasterGameMode.generated.h"
-
 
 namespace MatchState
 {
@@ -23,6 +23,10 @@ public:
 
 	virtual void RequestRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController);
 	virtual void Tick(float DeltaSeconds) override;
+
+	void PlayerLeftGame(ABlasterPlayerState* LeavingPlayerState);
+
+	bool ShouldEndGame();
 
 	UPROPERTY(EditDefaultsOnly)
 	float WarmupTime = 10.f;
@@ -46,4 +50,7 @@ private:
 
 	UPROPERTY()
 	UAudioComponent* LobbyMusicComp;
+
+	UPROPERTY(EditAnywhere)
+	int32 FullScore = 5;
 };

@@ -92,6 +92,12 @@ protected:
 		UPrimitiveComponent* OtherComponent,
 		int32 OtherIndex
 	);
+	
+	UPROPERTY(EditAnywhere)
+	float Damage = 20.f;
+	
+	UPROPERTY(EditAnywhere)
+	float HeadShotDamage = 20.f;
 
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	USkeletalMeshComponent* WeaponMesh;

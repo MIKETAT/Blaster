@@ -9,7 +9,7 @@
 // Handle Score change both on server and on client 
 void ABlasterPlayerState::ScoreChange(float ScoreAmount)
 {
-	Character = Character == nullptr ? Cast<ABlasterCharacter>(GetPawn()) : Character;
+	Character = Cast<ABlasterCharacter>(GetPawn());
 	if (Character)
 	{
 		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
@@ -23,7 +23,7 @@ void ABlasterPlayerState::ScoreChange(float ScoreAmount)
 // Handle Defeats change
 void ABlasterPlayerState::DefeatsChange(int32 DefeatsAmount)
 {
-	Character = Character == nullptr ? Cast<ABlasterCharacter>(GetPawn()) : Character;
+	Character = Cast<ABlasterCharacter>(GetPawn());
 	if (Character)
 	{
 		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;

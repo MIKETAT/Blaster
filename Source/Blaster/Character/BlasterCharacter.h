@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -11,14 +9,16 @@
 #include "GameFramework/Character.h"
 #include "BlasterCharacter.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLeftGame);
+
 class UBuffComponent;
 class UCombatComponent;
-class ABlasterPlayerState;
 enum class ECombatState : uint8;
 class UTimelineComponent;
 class ABlasterGameMode;
 class UCameraComponent;
 class AWeapon;
+class ABlasterPlayerState;
 
 UCLASS()
 class BLASTER_API ABlasterCharacter : public ACharacter, public IInteractWithCrosshairsInterface
@@ -55,12 +55,10 @@ public:
 	{
 		return BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
 	}
-
 	FORCEINLINE ABlasterGameMode* GetBlasterGameMode() const
 	{
 		return BlasterGameMode == nullptr ? GetWorld()->GetAuthGameMode<ABlasterGameMode>() : BlasterGameMode;
 	}
-
 	FORCEINLINE bool IsElimmed() const { return bElimmed; }
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE void SetHealth(float Amount) { Health = Amount; }
@@ -68,11 +66,12 @@ public:
 	FORCEINLINE float GetShield() const { return Shield; }
 	FORCEINLINE void SetShield(float Amount) { Shield = Amount; }
 	FORCEINLINE float GetMaxShield() const { return MaxShield; }
-	FORCEINLINE ABlasterPlayerState* GetBlasterPlayerState() const { return BlasterPlayerState; }
+	FORCEINLINE ABlasterPlayerState* GetBlasterPlayerState() const { return BlasterPlayerState == nullptr ? GetPlayerState<ABlasterPlayerState>() : BlasterPlayerState; }
 	FORCEINLINE UAnimMontage* GetReloadMontage() const { return ReloadMontage; }
 	FORCEINLINE UCombatComponent* GetCombat() const { return Combat; }
 	FORCEINLINE UBuffComponent* GetBuff() const { return Buff; }
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
+	FORCEINLINE bool IsHovering() const { return bHovering;}
 	ECombatState GetCombatState() const;
 	
 	float CalculateSpeed();
@@ -81,16 +80,27 @@ public:
 	void DropOrDestroyWeapons();
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastElim();
+	void MulticastElim(bool bPlayerLeftGame);
 
 	// Only on Server
-	void Elim();
+	void Elim(bool bPlayerLeftGame);
 
 	// 处理初始化相关的逻辑，
 	void PollInit();
 
 	//UFUNCTION(BlueprintImplementableEvent)
 	//void ShowSniperScopeWidget(bool bShowScope);
+
+	UFUNCTION(Server, Reliable)
+	void ServerLeaveGame();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastGainTheLead();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastLostTheLead();
+
+	FOnLeftGame OnLeftGame;
 	
 protected:
 	virtual void BeginPlay() override;
@@ -98,12 +108,13 @@ protected:
 	void MoveRight(float Value);
 	void Turn(float Value);
 	void LookUp(float Value);
+	void HoverButtonPressed();
 	void EquipButtonPressed();
 	void DropButtonPressed();
 	void CrouchButtonPressed();
 	void AimButtonPressed();
 	void AimButtonReleased();
-	void ReloadButtomPressed();
+	void ReloadButtonPressed();
 	void GrenadeButtonPressed();
 	void CalculateAO_Pitch();
 	void AimOffset(float DeltaTime);
@@ -135,7 +146,10 @@ private:
 	
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "ttrue"))
 	class UBuffComponent* Buff;
-
+	
+	UPROPERTY(ReplicatedUsing = OnRep_bHovering)
+	bool bHovering = false;
+	
 	float AO_Yaw;
 	float InterpAO_Yaw;
 	float AO_Pitch;
@@ -194,9 +208,14 @@ private:
 	
 	bool bElimmed = false;
 
-	ABlasterPlayerController* BlasterPlayerController;
-	class ABlasterGameMode* BlasterGameMode;
+	bool bLeftGame = false;
 
+	UPROPERTY()
+	ABlasterPlayerController* BlasterPlayerController;
+
+	UPROPERTY()
+	ABlasterGameMode* BlasterGameMode;
+	
 	FTimerHandle ElimTimer;
 	
 	UPROPERTY(EditDefaultsOnly)	// shouldn't have different elim timer
@@ -233,6 +252,13 @@ private:
 	UPROPERTY(EditAnywhere)
 	USoundCue* ElimBotSound;
 
+	UPROPERTY(EditAnywhere)
+	class UNiagaraSystem* CrownSystem;
+
+	UPROPERTY()
+	class UNiagaraComponent* CrownComponent;
+	
+	UPROPERTY()
 	class ABlasterPlayerState* BlasterPlayerState;
 	
 	/**
@@ -247,6 +273,9 @@ private:
 	void StartDissolve();
 	
 	void ElimTimerFinish();
+
+	UFUNCTION()
+	void OnRep_bHovering();
 	
 	UFUNCTION()
 	void OnRep_Health(float LastHealth);
@@ -261,6 +290,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerEquipButtonPressed();
+
+	UFUNCTION(Server, Reliable)
+	void ServerHoverButtonPressed();
 
 	void SetCharacterVisibility(bool bHide);
 

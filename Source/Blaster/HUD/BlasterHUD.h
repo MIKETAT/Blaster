@@ -53,6 +53,12 @@ public:
 	UPROPERTY()
 	class UAnnouncement* Announcement;
 
+	UPROPERTY(EditAnywhere, Category = "Announcement")
+	TSubclassOf<class UElimAnnouncement> ElimAnnouncementClass;
+
+	UPROPERTY()
+	UElimAnnouncement* ElimAnnouncement;
+
 	UPROPERTY(EditAnywhere, Category = "Sniper Scope")
 	TSubclassOf<UUserWidget> SniperScopeClass;
 
@@ -67,18 +73,32 @@ public:
 
 	void AddCharacterOverlay();
 	bool AddAnnouncement();
+	void AddElimAnnouncement(const FString& Attacker, const FString& Victim);
 	void ShowSniperScopeOverlay(bool bShowScope);
 	FORCEINLINE void SetHUDCrosshairEnabled(bool bEnable) { bCrosshairEnabled = bEnable; }
 	FORCEINLINE bool GetHUDCrosshairEnabled() const { return bCrosshairEnabled; }
 protected:
 	virtual void BeginPlay() override;
+
+	UFUNCTION()
+	void ElimAnnouncementTimerFinished(UElimAnnouncement* MsgToRemove);
 private:
+	UPROPERTY()
+	APlayerController* OwningController;
+	
 	FHUDPackage HUDPackage;
 
 	bool bCrosshairEnabled = false;
 
 	UPROPERTY(EditAnywhere)
 	float CrosshairSpreadMax = 15.f;
+
+	FTimerHandle ElimAnnouncementHandle;
+
+	FTimerDelegate ElimAnnouncementDelegate;
+
+	UPROPERTY(EditAnywhere)
+	float ElimAnnouncementExistTime = 5.f;
 	
 	void DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FVector2D Spread, FLinearColor CrosshairsColor);
 public:

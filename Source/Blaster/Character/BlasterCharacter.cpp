@@ -12,7 +12,10 @@
 #include <Kismet/KismetMathLibrary.h>
 #include <Sound/SoundCue.h>
 
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Blaster/Blaster.h"
+#include "Blaster/BlasterGameState.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "Blaster/Weapon/WeaponTypes.h"
 #include "Kismet/GameplayStatics.h"
@@ -74,6 +77,34 @@ void ABlasterCharacter::Destroyed()
 	if (ElimBotComponent)
 	{
 		ElimBotComponent->DestroyComponent();	
+	}
+}
+
+void ABlasterCharacter::MulticastGainTheLead_Implementation()
+{
+	if (CrownSystem == nullptr)	return;
+	if (CrownComponent == nullptr)
+	{
+		CrownComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			CrownSystem,
+			GetCapsuleComponent(),
+			FName(),
+			GetActorLocation() + FVector(0.f, 0.f, 100.f),
+			GetActorRotation(),
+			EAttachLocation::KeepWorldPosition,
+			false);
+	}
+	if (CrownSystem)
+	{
+		CrownComponent->Activate();
+	}
+}
+
+void ABlasterCharacter::MulticastLostTheLead_Implementation()
+{
+	if (CrownComponent)
+	{
+		CrownComponent->Deactivate();	
 	}
 }
 
@@ -299,17 +330,10 @@ void ABlasterCharacter::DropOrDestroyWeapons()
 	}
 }
 
-void ABlasterCharacter::Elim()
+void ABlasterCharacter::Elim(bool bPlayerLeftGame)
 {
 	DropOrDestroyWeapons();
-	
-	MulticastElim();
-	// Set Elim Timer
-	GetWorldTimerManager().SetTimer(
-		ElimTimer,
-		this,
-		&ABlasterCharacter::ElimTimerFinish,
-		ElimDelay);
+	MulticastElim(bPlayerLeftGame);
 }
 
 // deal with initialization
@@ -322,12 +346,30 @@ void ABlasterCharacter::PollInit()
 		{
 			BlasterPlayerState->AddToScore(0.f);
 			BlasterPlayerState->AddToDefeats(0);
+
+			ABlasterGameState* BlasterGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
+			if (BlasterGameState && BlasterGameState->TopScorePlayer.Contains(BlasterPlayerState))
+			{
+				MulticastGainTheLead();
+			}
 		}
 	}
 }
 
-void ABlasterCharacter::MulticastElim_Implementation()
+void ABlasterCharacter::ServerLeaveGame_Implementation()
 {
+	BlasterGameMode = GetBlasterGameMode();
+	BlasterPlayerState = GetBlasterPlayerState();
+	if (BlasterGameMode && BlasterPlayerState)
+	{
+		BlasterGameMode->PlayerLeftGame(BlasterPlayerState);
+	}
+	
+}
+
+void ABlasterCharacter::MulticastElim_Implementation(bool bPlayerLeftGame)
+{
+	bLeftGame = bPlayerLeftGame;
 	if (BlasterPlayerController)
 	{
 		BlasterPlayerController->SetHUDAmmo(0, 0);
@@ -375,13 +417,23 @@ void ABlasterCharacter::MulticastElim_Implementation()
 			ElimBotSound,
 			GetActorLocation());
 	}
+	if (CrownComponent)
+	{
+		CrownComponent->DestroyComponent();
+	}
 	bool bUseSniperAiming = IsLocallyControlled() && BlasterPlayerController &&
 		Combat && Combat->bIsAiming && Combat->EquippedWeapon &&
 		Combat->EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle; 
 	if (bUseSniperAiming)
 	{
 		BlasterPlayerController->SetHUDSniperScope(false);
-	} 
+	}
+	//  为了广播玩家离开死亡这一情况，需要ElimTimerFinish在server和client上都执行
+	GetWorldTimerManager().SetTimer(
+		ElimTimer,
+		this,
+		&ABlasterCharacter::ElimTimerFinish,
+		ElimDelay);
 }
 
 // start the timeline, and bind callback(UpdateDissolveMaterial) to dissolvetrack
@@ -410,13 +462,17 @@ void ABlasterCharacter::UpdateDissolveMaterial(float DissolveValue)
 void ABlasterCharacter::ElimTimerFinish()
 {
 	// Respawn Character
-	if (GetBlasterGameMode())
+	if (GetBlasterGameMode() && !bLeftGame)
 	{
 		GetBlasterGameMode()->RequestRespawn(this, Controller);	
 	}
 	if (ElimBotComponent)
 	{
 		ElimBotComponent->DestroyComponent();
+	}
+	if (bLeftGame && IsLocallyControlled())
+	{
+		OnLeftGame.Broadcast();
 	}
 }
 
@@ -433,8 +489,9 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction(TEXT("Aim"), IE_Released, this, &ABlasterCharacter::AimButtonReleased);
 	PlayerInputComponent->BindAction(TEXT("Fire"), IE_Pressed, this, &ABlasterCharacter::FireButtonPressed);
 	PlayerInputComponent->BindAction(TEXT("Fire"), IE_Released, this, &ABlasterCharacter::FireButtonReleased);
-	PlayerInputComponent->BindAction(TEXT("Reload"), IE_Pressed, this, &ABlasterCharacter::ReloadButtomPressed);
+	PlayerInputComponent->BindAction(TEXT("Reload"), IE_Pressed, this, &ABlasterCharacter::ReloadButtonPressed);
 	PlayerInputComponent->BindAction(TEXT("ThrowGrenade"), IE_Pressed, this, &ABlasterCharacter::GrenadeButtonPressed);
+	PlayerInputComponent->BindAction(TEXT("Hover"), IE_Pressed, this, &ABlasterCharacter::HoverButtonPressed);
 	
 	PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &ABlasterCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &ABlasterCharacter::MoveRight);
@@ -470,6 +527,21 @@ void ABlasterCharacter::Turn(float Value)
 void ABlasterCharacter::LookUp(float Value)
 {
 	AddControllerPitchInput(Value);
+}
+
+void ABlasterCharacter::HoverButtonPressed()
+{
+	ServerHoverButtonPressed();
+}
+
+void ABlasterCharacter::ServerHoverButtonPressed_Implementation()
+{
+	bHovering = !bHovering;
+}
+
+void ABlasterCharacter::OnRep_bHovering()
+{
+	
 }
 
 void ABlasterCharacter::EquipButtonPressed()
@@ -513,7 +585,7 @@ void ABlasterCharacter::AimButtonReleased()
 	}
 }
 
-void ABlasterCharacter::ReloadButtomPressed()
+void ABlasterCharacter::ReloadButtonPressed()
 {
 	if (Combat)
 	{
@@ -764,7 +836,6 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 	SimProxiesTurn();
 	TimeSinceLastReplication = 0.f;
 }
-
 
 void ABlasterCharacter::SetCharacterVisibility(bool bVisiable)
 {

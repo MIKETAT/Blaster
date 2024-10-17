@@ -7,6 +7,7 @@
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/Character/BlasterAnimInstance.h"
 #include "Blaster/PlayerController/BlasterPlayerController.h"
+#include "Blaster/Utils/DebugUtil.h"
 #include "Blaster/Weapon/Weapon.h"
 #include "Blaster/Weapon/WeaponTypes.h"
 #include "Camera/CameraComponent.h"
@@ -233,8 +234,9 @@ void UCombatComponent::UpdateAmmoHUD()
 {
 	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
 	if (Controller == nullptr)	return;
-	if (EquippedWeapon)
+	if (EquippedWeapon && CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
+		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
 		Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 	} else
 	{
@@ -323,10 +325,13 @@ int32 UCombatComponent::AmountToReload()
 {
 	if (Character == nullptr || EquippedWeapon == nullptr)	return 0;
 	int32 RoomForReload = EquippedWeapon->GetMaxCapacity() - EquippedWeapon->GetAmmo();
+	DebugUtil::PrintMsg(FString::Printf(TEXT("RoodForReload is %d"), RoomForReload), FColor::Red);
+	DebugUtil::LogMsg(FString::Printf(TEXT("RoodForReload is %d"), RoomForReload));
 	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
 		int32 CarriedWeaponAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
 		int32 Least = FMath::Min(CarriedWeaponAmmo, RoomForReload);
+		UE_LOG(LogTemp, Error, TEXT("CarriedWeaponAmmo = %d  Least = %d"), CarriedWeaponAmmo, Least);
 		return FMath::Clamp(RoomForReload, 0, Least);	
 	}
 	return 0;
@@ -586,6 +591,7 @@ void UCombatComponent::DropEquippedWeapon()
 	{
 		EquippedWeapon->Drop();	// 已有武器则扔掉替换
 	}
+	UpdateAmmoHUD();
 }
 
 void UCombatComponent::DropOrDestroyWeapon(AWeapon* WeaponToHandle)
@@ -597,6 +603,7 @@ void UCombatComponent::DropOrDestroyWeapon(AWeapon* WeaponToHandle)
 	} else {
 		WeaponToHandle->Drop();
 	}
+	UpdateAmmoHUD();
 }
 
 void UCombatComponent::AttachActorToRightHand(AActor* ActorToAttach)
@@ -683,6 +690,7 @@ void UCombatComponent::DropWeapon()
 		EquippedWeapon = nullptr;
 		HUD->SetHUDCrosshairEnabled(false);
 	}
+	UpdateAmmoHUD();
 }
 
 void UCombatComponent::EquipPrimitiveWeapon(AWeapon* WeaponToEquip)
@@ -729,7 +737,7 @@ bool UCombatComponent::ShouldSwapWeapon() const
 	{
 		return	Character && !Character->GetOverlappingWeapon() &&
 				EquippedWeapon && SecondaryWeapon &&
-				EquippedWeapon->CanFire();
+				EquippedWeapon->bCanFire;
 	}
 }
 
@@ -744,6 +752,7 @@ void UCombatComponent::SwapWeapons()
 	AttachActorToBackpack(SecondaryWeapon);
 	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
 	PlayEquipWeaponSound(EquippedWeapon);
+	AutoReloadEmptyWeapon();
 	UpdateAmmoHUD();
 }
 

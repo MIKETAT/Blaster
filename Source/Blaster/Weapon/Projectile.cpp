@@ -7,6 +7,7 @@
 #include "ProjectileRocket.h"
 #include "Blaster/Blaster.h"
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Blaster/Utils/DebugUtil.h"
 #include "Components/BoxComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"

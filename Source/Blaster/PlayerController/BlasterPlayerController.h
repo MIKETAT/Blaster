@@ -50,8 +50,16 @@ public:
 	void ClientJoinGame(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime);
 
 	virtual float GetServerTime();	// synced with server clock
+
+	void BroadcastElim(const FString& AttackerName, const FString& VictimName);
+
+	UFUNCTION(Client, Reliable)
+	void ClientElimAnnouncement(const FString& AttackerName, const FString& VictimName);
 protected:
 	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
+	void ShowReturnToMainMenu();
+	
 private:
 	UPROPERTY()
 	class ABlasterHUD* BlasterHUD;
@@ -73,6 +81,19 @@ private:
 	
 	// init HUD
 	bool bInitialize = false;
+
+	/**
+	 * Return To Main Menu Widget
+	 */
+	UPROPERTY(EditAnywhere, Category = HUD)
+	TSubclassOf<UUserWidget> ReturnToMainMenuClass;
+
+	UPROPERTY()
+	class UReturnToMainMenu* MainMenuWidget;
+
+	UPROPERTY()
+	bool bReturnToMainMenuOpen = false;
+	
 	
 	UFUNCTION()
 	void OnRep_MatchState();
