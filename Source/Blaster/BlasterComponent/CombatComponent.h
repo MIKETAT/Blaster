@@ -31,9 +31,13 @@ public:
 	void DropWeapon();
 	void EquipPrimitiveWeapon(AWeapon* WeaponToEquip);
 	void EquipSecondaryWeapon(AWeapon* WeaponToEquip);
-	bool ShouldSwapWeapon() const; // 返回此时是否可以切换武器 即 EquippedWeapon SecondaryWeapon均不为空且OverlappingWeapon为空
+	void DropCurrentWeaponAndEquipAnotherOne(AWeapon* WeaponToEquip);
+	// CanSwapWeapon means we have two weapons
+	FORCEINLINE bool CanSwapWeapon() const { return	Character && EquippedWeapon && SecondaryWeapon && EquippedWeapon->bCanFire; }; // 返回此时是否可以切换武器 即 EquippedWeapon SecondaryWeapon均不为空且OverlappingWeapon为空
 		
 	void SwapWeapons();
+	void TakeSecondaryWeapon();
+	void PutSecondaryWeapon();
 	
 	bool CanFire() const;
 	
@@ -55,6 +59,10 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void ServerLaunchGrenade(const FVector_NetQuantize& Target);
+
+	void FireHitScanWeapon();
+	void FireProjectileWeapon();
+	void FireShotgun();
 	
 protected:
 	virtual void BeginPlay() override;
@@ -65,6 +73,11 @@ protected:
 	 */
 	void FireButtonPressed(bool bPressed);
 	void Fire();
+	void LocalFire(const FVector_NetQuantize& TraceHitTarget);
+	void ShotgunLocalFire(const TArray<FVector_NetQuantize>& HitTargets);
+	void ShotgunServerFire(const TArray<FVector_NetQuantize>& HitTargets);
+	
+	
 	void StartFireTimer();
 	void FireTimerFinished();
 
@@ -86,7 +99,10 @@ protected:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
-
+	
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastShotgunFire(const TArray<FVector_NetQuantize>& HitTargets);
+	
 	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
 
 	void SetHUDCrosshairs(float DeltaTime);
@@ -111,9 +127,13 @@ private:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AWeapon> DefaultWeaponClass;
 	
-	UPROPERTY(Replicated)
-	bool bIsAiming;
+	UPROPERTY(ReplicatedUsing = OnRep_bIsAiming)
+	bool bIsAiming = false;
 
+	bool bAimingButtonPressed = false;		// is Aiming Button  pressed now
+
+	bool bLocallyReloading = false;			// same as bAimingButtonPressed. record whether we are reloading locally
+	
 	UPROPERTY(EditAnywhere)
 	float BaseWalkSpeed;
 
@@ -123,7 +143,7 @@ private:
 	bool bFireButtonPressed;
 
 	UPROPERTY(ReplicatedUsing = OnRep_CarriedAmmo);
-	int32 CarriedAmmo = 30;	// 当前所装备武器的携带数量
+	int32 CarriedAmmo = 30;	// 所携带的当前装备武器的子弹数量, 
 
 	UPROPERTY(EditAnywhere)
 	int32 MaxAmmoAmount = 500;
@@ -139,6 +159,9 @@ private:
 
 	UPROPERTY(ReplicatedUsing=OnRep_CombatState)
 	ECombatState CombatState = ECombatState::ECS_UnOccupied;
+
+	UFUNCTION()
+	void OnRep_bIsAiming();
 	
 	UFUNCTION()
 	void OnRep_CarriedAmmo();

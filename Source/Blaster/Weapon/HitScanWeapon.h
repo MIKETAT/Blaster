@@ -16,10 +16,8 @@ class BLASTER_API AHitScanWeapon : public AWeapon
 public:
 	virtual void Fire(const FVector& HitTarget) override;
 protected:
-	FVector TraceEndWithScatter(const FVector& TraceStart, const FVector& TraceTarget); 
+	//FVector TraceEndWithScatter(const FVector& TraceStart, const FVector& TraceTarget); 
 	void WeaponHit(const FVector& Start, const FVector& HitTarget, FHitResult& OutHit);
-	
-private:
 
 	UPROPERTY(EditAnywhere)
 	UParticleSystem* ImpactParticles;
@@ -35,19 +33,6 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* HitSound;
-
-	/**
-	 * Trace End With Scatter
-	 */
-	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
-	float DistanceToSphere = 800.f;
-
 	
-	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
-	float SphereRadius = 80.f;
-
-	
-	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
-	bool bUseScatter = false;
-	
+private:
 };

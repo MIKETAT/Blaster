@@ -5,8 +5,10 @@
 
 #include "AssetTypeCategories.h"
 #include "BlasterCharacter.h"
+#include "DrawDebugHelpers.h"
 #include "Blaster/BlasterTypes/CombatState.h"
 #include "Blaster/Weapon/Weapon.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 
@@ -43,6 +45,11 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsAiming = BlasterCharacter->isAiming();
 	bElimmed = BlasterCharacter->IsElimmed();
 	bUseFABRIK = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
+	if (BlasterCharacter->IsLocallyControlled() && BlasterCharacter->GetCombatState() != ECombatState::ECS_ThrowingGrenade)
+	{
+		bUseFABRIK = !BlasterCharacter->IsLocallyReloading();
+	}
+	
 	bUseAimOffsets = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
 	bUseTransformRightHand = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
 	TurningInPlace = BlasterCharacter->GetTurningInPlace();
@@ -94,8 +101,8 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		FTransform MuzzleTipTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("MuzzleFlash"), ERelativeTransformSpace::RTS_World);
 		// GetRotation returns a quat, and .Rotator returns  rotation
 		FVector MuzzleTipDirection(FRotationMatrix(MuzzleTipTransform.GetRotation().Rotator()).GetUnitAxis(EAxis::X));
-		DrawDebugLine(GetWorld(), MuzzleTipTransform.GetLocation(), MuzzleTipTransform.GetLocation() + MuzzleTipDirection * 1000.f, FColor::Red);
-		DrawDebugLine(GetWorld(), MuzzleTipTransform.GetLocation(), BlasterCharacter->GetHitTarget(), FColor::Blue);
+		//DrawDebugLine(GetWorld(), MuzzleTipTransform.GetLocation(), MuzzleTipTransform.GetLocation() + MuzzleTipDirection * 1000.f, FColor::Red);
+		//DrawDebugLine(GetWorld(), MuzzleTipTransform.GetLocation(), BlasterCharacter->GetHitTarget(), FColor::Blue);
 	}
 }
   

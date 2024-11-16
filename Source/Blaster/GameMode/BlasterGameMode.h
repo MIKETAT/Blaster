@@ -16,13 +16,15 @@ UCLASS()
 class BLASTER_API ABlasterGameMode : public AGameMode
 {
 	GENERATED_BODY()
-	ABlasterGameMode();
 public:
+	ABlasterGameMode();
 	virtual void PlayerEliminated(class ABlasterCharacter* EliminatedCharacter,
 		class ABlasterPlayerController* VictimController, ABlasterPlayerController* AttackerController);
 
 	virtual void RequestRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController);
 	virtual void Tick(float DeltaSeconds) override;
+
+	virtual float CalculateDamage(AController* AttackerController, AController* VictimController, float BaseDamage);
 
 	void PlayerLeftGame(ABlasterPlayerState* LeavingPlayerState);
 
@@ -42,6 +44,8 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void OnMatchStateSet() override;
 	virtual void HandleMatchCoolDown();
+
+	bool bTeamMatch = false;
 private:
 	float CountDownTime;
 

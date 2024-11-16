@@ -28,6 +28,7 @@ class BLASTER_API ABlasterCharacter : public ACharacter, public IInteractWithCro
 // Functions
 public:
 	ABlasterCharacter();
+	void ConstructHitBox();
 	virtual void Destroyed() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -72,6 +73,8 @@ public:
 	FORCEINLINE UBuffComponent* GetBuff() const { return Buff; }
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
 	FORCEINLINE bool IsHovering() const { return bHovering;}
+	FORCEINLINE class ULagCompensationComponent* GetLagCompensationComponent() const { return LagCompensation; }
+	bool IsLocallyReloading();
 	ECombatState GetCombatState() const;
 	
 	float CalculateSpeed();
@@ -85,6 +88,9 @@ public:
 	// Only on Server
 	void Elim(bool bPlayerLeftGame);
 
+	
+	void SetTeamColor(ETeam TeamToSet);
+	
 	// 处理初始化相关的逻辑，
 	void PollInit();
 
@@ -102,6 +108,8 @@ public:
 
 	FOnLeftGame OnLeftGame;
 	
+	UPROPERTY()
+	TMap<FName, class UBoxComponent*> HitCollisionBoxes;
 protected:
 	virtual void BeginPlay() override;
 	void MoveForward(float Value);
@@ -134,18 +142,78 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = Camera)
 	class UCameraComponent* FollowCamera;
+	
+	/**
+	 *	Hit Box 
+	 */
+	UPROPERTY(EditAnywhere)
+	class UBoxComponent* head;
 
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* pelvis;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* spine_02;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* spine_03;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* upperarm_l;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* upperarm_r;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* lowerarm_l;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* lowerarm_r;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* hand_l;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* hand_r;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* backpack;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* blanket;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* thigh_l;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* thigh_r;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* calf_l;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* calf_r;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* foot_l;
+
+	UPROPERTY(EditAnywhere)
+	UBoxComponent* foot_r;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class UWidgetComponent* OverheadWidget;
 
 	UPROPERTY(ReplicatedUsing = OnRep_OverlappingWeapon)
 	class AWeapon* OverlappingWeapon;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "ttrue"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class UCombatComponent* Combat;
 	
-	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "ttrue"))
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	class UBuffComponent* Buff;
+
+	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
+	class ULagCompensationComponent* LagCompensation;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_bHovering)
 	bool bHovering = false;
@@ -239,6 +307,24 @@ private:
 	// Material Instance set on bp, used with dynamic material instance 
 	UPROPERTY(EditAnywhere, Category= Elim)
 	UMaterialInstance* DissolveMaterialInstance;
+
+	/**
+	 * Team Color
+	 */
+	UPROPERTY(EditAnywhere, Category = Elim)
+	UMaterialInstance* RedDissolveMatInst;
+
+	UPROPERTY(EditAnywhere, Category = Elim)
+	UMaterialInstance* BlueDissolveMatInst;
+
+	UPROPERTY(EditAnywhere, Category = Elim)
+	UMaterialInstance* RedMaterial;
+
+	UPROPERTY(EditAnywhere, Category = Elim)
+	UMaterialInstance* BlueMaterial;
+
+	UPROPERTY(EditAnywhere, Category = Elim)
+	UMaterialInstance* OriginalMaterial;
 	
 	/**
 	 * Elim Bot
@@ -290,6 +376,9 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerEquipButtonPressed();
+
+	UFUNCTION(Server, Reliable)
+	void ServerDropButtonPressed();
 
 	UFUNCTION(Server, Reliable)
 	void ServerHoverButtonPressed();

@@ -3,7 +3,9 @@
 
 #include "OverheadWidget.h"
 
+#include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "Components/TextBlock.h"
+#include "Kismet/GameplayStatics.h"
 
 void UOverheadWidget::SetDisplayText(FString TextToDisplay)
 {
@@ -52,7 +54,25 @@ void UOverheadWidget::ShowPlayerNetRole(APawn* InPawn)
 	//FString PlayerName = InPawn->GetPlayerState()->GetPlayerName();
 	//FString RemoteRoleString = FString::Printf(TEXT("Remote Role is %s, and PlayerName is %s"), *Role, *PlayerName);
 	//FString RemoteRoleString = FString::Printf(TEXT("Remote Role is %s"), *RemoteRole);
-	FString RoleText = FString::Printf(TEXT("%s / %s"), *RemoteRole, *Role);
+	//FString RoleText = FString::Printf(TEXT("%s / %s"), *RemoteRole, *Role);
+	
+	ABlasterPlayerState* BPState = Cast<ABlasterPlayerState>(InPawn->GetPlayerState());
+	
+	FString RoleText;
+	if (!BPState)
+	{
+		RoleText = FString("BPState is null");
+	}
+	else if (BPState->GetTeam() == ETeam::ET_TeamBlue)
+	{
+		RoleText = FString("Team:Blue");
+	} else if (BPState->GetTeam() == ETeam::ET_TeamRed) {
+		RoleText = FString("Team: Red");
+	} else
+	{
+		RoleText = FString("No Team");
+	}
+	
 	SetDisplayText(RoleText);
 }
 

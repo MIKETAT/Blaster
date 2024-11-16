@@ -28,12 +28,17 @@ public:
 	void SetHUDTime();
 	void SetHUDAnnouncementCountDown(float CountDown);
 	void SetHUDSniperScope(bool bShowScope);
+	void SetHUDRedTeamScore(int32 RedScore);
+	void SetHUDBlueTeamScore(int32 BlueScore);
 	virtual void OnPossess(APawn* InPawn) override;
 	void HandleMatchWaitToStart();
-	void HandleMatchStart();
+	void HandleMatchStart(bool bTeamMatch = false);
 	void HandleMatchCoolDown();
-	void SetMatchState(FName State);
-	FString GetCurrentTopPlayerInfo();
+	void SetMatchState(FName State, bool bTeamMatch = false);
+	void InitTeamScore();
+	void HideTeamScore();
+	FString GetCurrentTopPlayerInfo() const;
+	FString GetTeamInfo(class ABlasterGameState* ABGState) const;
 	void PollInit();
 	// Client -> Server
 	UFUNCTION(Server, Reliable)
@@ -55,11 +60,20 @@ public:
 
 	UFUNCTION(Client, Reliable)
 	void ClientElimAnnouncement(const FString& AttackerName, const FString& VictimName);
+
+	void HighPingWarning(bool bShouldWarning);
+	void CheckPing(float DeltaSeconds);
+	FORCEINLINE float GetSingleTripTime() const { return SingleTripTime; }
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 	void ShowReturnToMainMenu();
-	
+
+	UPROPERTY(ReplicatedUsing = OnRep_bShowTeamScore)
+	bool bShowTeamScore = false;
+
+	UFUNCTION()
+	void OnRep_bShowTeamScore();
 private:
 	UPROPERTY()
 	class ABlasterHUD* BlasterHUD;
@@ -94,6 +108,23 @@ private:
 	UPROPERTY()
 	bool bReturnToMainMenuOpen = false;
 	
+	UPROPERTY()
+	float HighPingCheckingTime = 0.f;	// Warning的已持续时间
+
+	UPROPERTY()
+	float HighPingAnimExistingTime = 0.f;
+
+	UPROPERTY(EditAnywhere)
+	float HighPingTime = 5.f;	// Warning动画 需要展示的时间  todo 如何声明为常量？
+
+	UPROPERTY(EditAnywhere)
+	float HighPingThreshold = 50.f;
+
+	UPROPERTY(EditAnywhere)
+	float HighPingCheckFrequency = 20.f;
+
+	UPROPERTY()
+	float SingleTripTime;
 	
 	UFUNCTION()
 	void OnRep_MatchState();

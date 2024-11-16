@@ -4,6 +4,7 @@
 #include "HitScanWeapon.h"
 
 #include "WeaponTypes.h"
+#include "Blaster/BlasterComponent/LagCompensationComponent.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/Utils/DebugUtil.h"
 #include "Engine/SkeletalMeshSocket.h"
@@ -12,7 +13,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "Sound/SoundCue.h"
 
-void AHitScanWeapon::Fire(const FVector& HitTarget)
+void AHitScanWeapon::Fire(const FVector& HitTarget) 
 {
 	Super::Fire(HitTarget);
 
@@ -29,27 +30,44 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 		FHitResult HitResult;
 		UWorld* World = GetWorld();
 		if (!World)		return;
-		/*World->LineTraceSingleByChannel(
-			HitResult,
-			Start,
-			End,
-			ECC_Visibility);*/
 		WeaponHit(Start, End, HitResult);
 		DebugUtil::PrintMsg(HitResult.BoneName, FColor::Blue);
 		if (HitResult.bBlockingHit)
 		{
 			// 命中人物
-			ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(HitResult.GetActor());
+			ABlasterCharacter* HitCharacter = Cast<ABlasterCharacter>(HitResult.GetActor());
 			// On SimulateProxy 上 Controller为nullptr， 只在ApplyDamage上进行检查
-			if (BlasterCharacter && HasAuthority() && InstigatorController)
+			if (HitCharacter && InstigatorController)
 			{
 				float DamageToCause = HitResult.BoneName == FString("head") ? HeadShotDamage : Damage;
-				UGameplayStatics::ApplyDamage(
-					BlasterCharacter,
+				// todo 这里的四种情况, server/client + rewind/not rewind 需要考虑, 特别是 server上使用rewind 或者client 不使用rewind两种
+				if (HasAuthority() && !bUseServerSideRewind)	// todo 与教程不一致, 这样似乎更合理
+				{
+					DebugUtil::PrintMsg(TEXT("Apply Damage Directly"));
+					UGameplayStatics::ApplyDamage(
+					HitCharacter,
 					DamageToCause,
 					InstigatorController,
 					this,
-					UDamageType::StaticClass());	
+					UDamageType::StaticClass());
+					DebugUtil::PrintMsg(FString::Printf(TEXT("Cause Damage %f"), DamageToCause), FColor::Red);
+				}
+				if (!HasAuthority() && bUseServerSideRewind)  // client and use ServerSideRewind
+				{
+					BlasterOwner = BlasterOwner == nullptr ? Cast<ABlasterCharacter>(InstigatorOwner) : BlasterOwner;
+					BlasterController = BlasterController == nullptr ? Cast<ABlasterPlayerController>(InstigatorController) : BlasterController;
+					if (BlasterOwner && BlasterController && BlasterOwner->GetLagCompensationComponent())
+					{
+						DebugUtil::PrintMsg(TEXT("Apply Damage Using Server Request"));
+						BlasterOwner->GetLagCompensationComponent()->ServerRequestScore(
+							HitCharacter,
+							Start,
+							HitTarget,
+							BlasterController->GetServerTime() - BlasterController->GetSingleTripTime(),
+							this);
+					}
+				}
+				
 			}
 			if (ImpactParticles)
 			{
@@ -66,13 +84,8 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					HitSound,
 					HitResult.ImpactPoint);
 			}
-		} else
-		{
-			// 
 		}
-		
-		// 没击中也要有SmokeTrail
-		if (BeamParticle)
+		if (BeamParticle)	// 没击中也要有SmokeTrail
 		{
 			UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(
 				World,
@@ -83,7 +96,6 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 				Beam->SetVectorParameter(FName("Target"), HitResult.bBlockingHit ? HitResult.ImpactPoint : End);
 			}
 		}
-		
 		if (MuzzleFlash)
 		{
 			UGameplayStatics::SpawnEmitterAtLocation(
@@ -91,7 +103,6 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 				MuzzleFlash,
 				SocketTransform);
 		}
-
 		if (FireSound)
 		{
 			UGameplayStatics::PlaySoundAtLocation(
@@ -102,21 +113,19 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 	}
 }
 
-FVector AHitScanWeapon::TraceEndWithScatter(const FVector& TraceStart, const FVector& TraceTarget)
-{
-	FVector ToTargetNormalized = (TraceTarget - TraceStart).GetSafeNormal();
-	FVector SphereCenter = TraceStart + ToTargetNormalized * DistanceToSphere;
-	FVector RandomVec = UKismetMathLibrary::RandomUnitVector() * FMath::RandRange(0.f, SphereRadius);
-	FVector RandomEnd = SphereCenter + RandomVec;
-	FVector ToTraceEnd = RandomEnd - TraceStart;
-	return FVector(TraceStart + TRACE_LENGTH * ToTraceEnd / ToTraceEnd.Size());
-}
-
 void AHitScanWeapon::WeaponHit(const FVector& Start, const FVector& HitTarget, FHitResult& OutHit)
 {
-	DrawDebugPoint(GetWorld(), Start, 9.f, FColor::Purple, true);
-	FVector End = bUseScatter ? TraceEndWithScatter(Start, HitTarget) :  Start + (HitTarget - Start) * 1.25f;
 	UWorld* World = GetWorld();
-	if (World == nullptr)		return;
+	if (!World)		return;
+	FVector End = Start + (HitTarget - Start) * 1.25f;
 	World->LineTraceSingleByChannel(OutHit, Start, End, ECC_Visibility);
+	FVector BeamEnd = End;
+	if (OutHit.bBlockingHit)
+	{
+		BeamEnd = OutHit.ImpactPoint;
+	} else
+	{
+		OutHit.ImpactPoint = End;
+	}
+	DrawDebugSphere(GetWorld(), BeamEnd, 9.f, 10, FColor::Purple, true);
 }

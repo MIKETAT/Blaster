@@ -3,7 +3,7 @@
 
 #include "ReturnToMainMenu.h"
 
-#include "MultiplayerSessionsSubsystem.h"
+#include "MultiplayerSessionSubsystem.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Components/Button.h"
 #include "GameFramework/GameModeBase.h"
@@ -33,10 +33,10 @@ void UReturnToMainMenu::MenuSetup()
 	UGameInstance* GameInstance = GetGameInstance();
 	if (GameInstance)
 	{
-		MultiplayerSessionsSubsystem = GameInstance->GetSubsystem<UMultiplayerSessionsSubsystem>();
+		MultiplayerSessionsSubsystem = GameInstance->GetSubsystem<UMultiplayerSessionSubsystem>();
 		if (MultiplayerSessionsSubsystem)
 		{
-			MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionComplete.AddDynamic(this, &UReturnToMainMenu::OnDestroySession);
+			MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionCompleteDelegate.AddDynamic(this, &UReturnToMainMenu::OnDestroySession);
 		}
 	}
 }
@@ -59,9 +59,9 @@ void UReturnToMainMenu::MenuTearDown()
 	{
 		ReturnButton->OnClicked.RemoveDynamic(this, &UReturnToMainMenu::ReturnButtonClicked);
 	}
-	if (MultiplayerSessionsSubsystem && MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionComplete.IsBound())
+	if (MultiplayerSessionsSubsystem && MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionCompleteDelegate.IsBound())
 	{
-		MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionComplete.RemoveDynamic(this, &UReturnToMainMenu::OnDestroySession);
+		MultiplayerSessionsSubsystem->MultiplayerOnDestroySessionCompleteDelegate.RemoveDynamic(this, &UReturnToMainMenu::OnDestroySession);
 	}
 }
 

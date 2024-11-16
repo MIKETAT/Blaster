@@ -4,6 +4,7 @@
 #include "BlasterPlayerState.h"
 
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Blaster/Utils/DebugUtil.h"
 #include "Net/UnrealNetwork.h"
 
 // Handle Score change both on server and on client 
@@ -34,6 +35,26 @@ void ABlasterPlayerState::DefeatsChange(int32 DefeatsAmount)
 	}
 }
 
+void ABlasterPlayerState::SetTeam(ETeam TeamToSet)
+{
+	DebugUtil::PrintMsg(FString::Printf(TEXT("SetTeam")), FColor::Green);
+	Team = TeamToSet;
+	Character = Cast<ABlasterCharacter>(GetPawn());
+	if (Character)
+	{
+		Character->SetTeamColor(Team);
+	}
+}
+
+void ABlasterPlayerState::OnRep_Team()
+{
+	Character = Cast<ABlasterCharacter>(GetPawn());
+	if (Character)
+	{
+		Character->SetTeamColor(Team);
+	}
+}
+
 // call it on the server
 void ABlasterPlayerState::AddToScore(float ScoreAmount)
 {
@@ -52,6 +73,7 @@ void ABlasterPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ABlasterPlayerState, Defeats);
+	DOREPLIFETIME(ABlasterPlayerState, Team);
 }
 
 void ABlasterPlayerState::OnRep_Score()

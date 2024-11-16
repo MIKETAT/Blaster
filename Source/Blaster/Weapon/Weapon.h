@@ -21,6 +21,15 @@ enum class EWeaponState : uint8
 	EWS_Default_MAX UMETA(DisplayName = "DefaultMAX")
 };
 
+UENUM(BlueprintType)
+enum class EFireType : uint8
+{
+	EFT_HitScan UMETA(DisplayName = "HitScan Weapon"),
+	EFT_Projectile UMETA(DisplayName = "Projectile Weapon"),
+	EFT_Shotgun UMETA(DisplayName = "Shotgun Weapon"),
+	EFT_MAX UMETA(DisplayName = "Default MAX")
+};
+
 UCLASS()
 class BLASTER_API AWeapon : public AActor
 {
@@ -47,10 +56,10 @@ public:
 	FORCEINLINE void SetWeaponFireStatus(bool CanFire) { bCanFire = CanFire; }
 	FORCEINLINE FTimerHandle& GetFireTimer() { return FireTimer; }
 	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
+	FORCEINLINE float GetDamage() const { return Damage; }
+	FORCEINLINE float GetHeadshotDamage() const { return HeadShotDamage; }
 	void Drop();
 	void SetWeaponPhysicsAndCollision(bool bEnable);
-
-	
 	void SetWeaponState(EWeaponState state);
 	FORCEINLINE EWeaponState GetWeaponState() const { return WeaponState; }
 	void OnWeaponStateChange();
@@ -58,12 +67,13 @@ public:
 	void OnDrop();
 	void OnEquipSecondary();
 	
-	UFUNCTION()
-	void OnRep_Ammo();
+	//UFUNCTION()
+	//void OnRep_Ammo();
 	virtual void OnRep_Owner() override;
 	void SpendRound();
 	void SetHUDAmmo();
 	void AddAmmo(int AmmoAmount);
+	FVector TraceEndWithScatter(const FVector& HitTarget);
 
 	/**
 	 * Enable or Disable custom depth
@@ -72,9 +82,24 @@ public:
 	
 	UPROPERTY()
 	bool bCanFire = true;
+
+	UPROPERTY(EditAnywhere)
+	EFireType FireType;
+
+	// unprocessed server request for ammo
+	int32 Sequence = 0;
+
+	UFUNCTION(Client, Reliable)
+	void ClientUpdateAmmo(int32 ServerAmmo);	
+
+	UFUNCTION(Client, Reliable)
+	void ClientAddAmmo(int32 AmmoToAdd);
+
+	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
+	bool bUseScatter = false;
 protected:
 	virtual void BeginPlay() override;
-
+	virtual const FName& GetWeaponName() const;
 	UFUNCTION( )
 	virtual void OnSphereOverlap(
 		UPrimitiveComponent* OverlapComponent,
@@ -92,12 +117,18 @@ protected:
 		UPrimitiveComponent* OtherComponent,
 		int32 OtherIndex
 	);
+
+	UPROPERTY(EditAnywhere)
+	FName WeaponName;		// Edit In BP
 	
 	UPROPERTY(EditAnywhere)
 	float Damage = 20.f;
 	
 	UPROPERTY(EditAnywhere)
 	float HeadShotDamage = 20.f;
+
+	UPROPERTY(EditAnywhere)
+	bool bUseServerSideRewind = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	USkeletalMeshComponent* WeaponMesh;
@@ -132,12 +163,12 @@ protected:
 	 *	Zoomed FOV while Aiming
 	 */
 	UPROPERTY(EditAnywhere)
-	float ZoomedFOV = 30.f;
+	float ZoomedFOV = 70.f;
 
 	UPROPERTY(EditAnywhere)
 	float ZoomInterSpeed = 20.f;
 	
-	UPROPERTY(EditAnywhere, ReplicatedUsing= OnRep_Ammo)
+	UPROPERTY(EditAnywhere)		//, ReplicatedUsing= OnRep_Ammo
 	int32 Ammo = 30;
 
 	UPROPERTY(EditAnywhere)
@@ -151,6 +182,16 @@ protected:
 
 	UPROPERTY(EditAnywhere)
 	EWeaponType WeaponType;
+	
+	/**
+	 * Trace End With Scatter
+	 */
+	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
+	float DistanceToSphere = 800.f;
+
+	
+	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
+	float SphereRadius = 80.f;
 
 // public variables 
 public:
@@ -180,4 +221,5 @@ public:
 
 private:
 	bool bIsDefaultWeapon = false;		// 如果是自带的武器，角色携带其死亡时销毁
+
 };

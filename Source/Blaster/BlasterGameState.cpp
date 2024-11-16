@@ -11,6 +11,29 @@ void ABlasterGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ABlasterGameState, TopScorePlayer);
+	DOREPLIFETIME(ABlasterGameState, TeamRedScore);
+	DOREPLIFETIME(ABlasterGameState, TeamBlueScore);
+
+}
+
+void ABlasterGameState::TeamRedScores()
+{
+	++TeamRedScore;
+	ABlasterPlayerController* BPController = Cast<ABlasterPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (BPController)
+	{
+		BPController->SetHUDRedTeamScore(TeamRedScore);
+	}
+}
+
+void ABlasterGameState::TeamBlueScores()
+{
+	++TeamBlueScore;
+	ABlasterPlayerController* BPController = Cast<ABlasterPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (BPController)
+	{
+		BPController->SetHUDBlueTeamScore(TeamBlueScore);
+	}
 }
 
 void ABlasterGameState::OnRep_TopScorePlayer()
@@ -37,5 +60,23 @@ void ABlasterGameState::UpdateTopScorePlayer(ABlasterPlayerState* PlayerState)
 			TopScorePlayer.Add(PlayerState);
 			TopScore = PlayerState->GetScore();
 		}
+	}
+}
+
+void ABlasterGameState::OnRep_TeamRedScore()
+{
+	ABlasterPlayerController* BPController = Cast<ABlasterPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (BPController)
+	{
+		BPController->SetHUDRedTeamScore(TeamRedScore);
+	}
+}
+
+void ABlasterGameState::OnRep_TeamBlueScore()
+{
+	ABlasterPlayerController* BPController = Cast<ABlasterPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (BPController)
+	{
+		BPController->SetHUDBlueTeamScore(TeamBlueScore);
 	}
 }

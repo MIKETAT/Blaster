@@ -40,4 +40,16 @@ public:
 
 	UPROPERTY(meta= (BindWidget))
 	UTextBlock* GrenadesAmount;
+
+	UPROPERTY(meta= (BindWidget))
+	UTextBlock* RedTeamScore;
+	
+	UPROPERTY(meta= (BindWidget))
+	UTextBlock* BlueTeamScore;
+
+	UPROPERTY(meta = (BindWidget))
+	class UImage* HighPingImage;
+
+	UPROPERTY(meta = (BindWidgetAnim), Transient)		// todo Transient的含义作用
+	UWidgetAnimation* HighPingWarningAnim;
 };

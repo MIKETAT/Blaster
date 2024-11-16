@@ -8,6 +8,7 @@
 #include "Blaster/HUD/ElimAnnouncement.h"
 #include "Blueprint/UserWidget.h"
 #include "SniperScopeOverlayWidget.h"
+#include "Engine/Canvas.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
 
@@ -133,7 +134,7 @@ void ABlasterHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, F
 		ViewportCenter.X - (TextureWidth / 2.f) + Spread.X,
 		ViewportCenter.Y - (TextureHeight / 2.f) + Spread.Y
 	);
-
+	
 	DrawTexture(
 		Texture,
 		TextureDrawPoint.X,

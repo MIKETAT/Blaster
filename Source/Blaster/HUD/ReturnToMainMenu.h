@@ -30,7 +30,7 @@ private:
 	class UButton* ReturnButton;
 
 	UPROPERTY()
-	class UMultiplayerSessionsSubsystem* MultiplayerSessionsSubsystem;
+	class UMultiplayerSessionSubsystem* MultiplayerSessionsSubsystem;
 
 	UPROPERTY()
 	class APlayerController* PlayerController;

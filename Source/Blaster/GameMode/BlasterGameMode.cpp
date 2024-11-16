@@ -6,6 +6,7 @@
 #include "Blaster/BlasterGameState.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Blaster/Utils/DebugUtil.h"
 #include "Components/AudioComponent.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
@@ -48,8 +49,11 @@ void ABlasterGameMode::OnMatchStateSet()
 	}
 	for (FConstPlayerControllerIterator it = GetWorld()->GetPlayerControllerIterator(); it; it++)
 	{
-		ABlasterPlayerController* PlayerController = Cast<ABlasterPlayerController>(*it);
-		PlayerController->SetMatchState(MatchState);
+		ABlasterPlayerController* BPlayerController = Cast<ABlasterPlayerController>(*it);
+		if (BPlayerController)
+		{
+			BPlayerController->SetMatchState(MatchState, bTeamMatch);
+		}
 	}
 }
 
@@ -85,6 +89,12 @@ void ABlasterGameMode::Tick(float DeltaSeconds)
 			// todo restartGame后的处理，是否需要禁用一些输入。考虑不禁用输入但禁用伤害
 		}
 	}
+}
+
+float ABlasterGameMode::CalculateDamage(AController* AttackerController, AController* VictimController, float BaseDamage)
+{
+	DebugUtil::PrintMsg(FString("BlasterGameMode, Calculate Damage"), FColor::Red);
+	return BaseDamage;
 }
 
 void ABlasterGameMode::PlayerLeftGame(ABlasterPlayerState* LeavingPlayerState)

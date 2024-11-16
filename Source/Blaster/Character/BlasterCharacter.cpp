@@ -16,8 +16,11 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Blaster/Blaster.h"
 #include "Blaster/BlasterGameState.h"
+#include "Blaster/BlasterComponent/LagCompensationComponent.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Blaster/Utils/DebugUtil.h"
 #include "Blaster/Weapon/WeaponTypes.h"
+#include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystemComponent.h"
 
@@ -33,7 +36,9 @@ ABlasterCharacter::ABlasterCharacter()
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	FollowCamera->bUsePawnControlRotation = false;
+	FollowCamera->bUsePawnControlRotation = false;	//
+
+	ConstructHitBox();
 
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -49,6 +54,9 @@ ABlasterCharacter::ABlasterCharacter()
 	
 	Buff = CreateDefaultSubobject<UBuffComponent>(TEXT("BuffComponent"));
 	Buff->SetIsReplicated(true);
+
+	LagCompensation = CreateDefaultSubobject<ULagCompensationComponent>(TEXT("LagCompensaton"));
+	LagCompensation->SetIsReplicated(false);	//only on server
 	
 	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
 
@@ -71,6 +79,100 @@ ABlasterCharacter::ABlasterCharacter()
 	AttachedGrenade->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
+void ABlasterCharacter::ConstructHitBox()
+{
+	DebugUtil::LogMsg(FString::Printf(TEXT("Constructing Hit Box")));
+	head = CreateDefaultSubobject<UBoxComponent>(TEXT("head"));
+	head->SetupAttachment(GetMesh(), FName("head"));
+	head->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("head"), head);
+	
+	pelvis = CreateDefaultSubobject<UBoxComponent>(TEXT("pelvis"));
+	pelvis->SetupAttachment(GetMesh(), FName("pelvis "));
+	pelvis->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("pelvis"), pelvis);
+
+	spine_02 = CreateDefaultSubobject<UBoxComponent>(TEXT("spine_02"));
+	spine_02->SetupAttachment(GetMesh(), FName("spine_02"));
+	spine_02->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("spine_02"), spine_02);
+
+	spine_03 = CreateDefaultSubobject<UBoxComponent>(TEXT("spine_03"));
+	spine_03->SetupAttachment(GetMesh(), FName("spine_03"));
+	spine_03->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("spine_03"), spine_03);
+
+	upperarm_l = CreateDefaultSubobject<UBoxComponent>(TEXT("upperarm_l"));
+	upperarm_l->SetupAttachment(GetMesh(), FName("upperarm_l"));
+	upperarm_l->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("upperarm_l"), upperarm_l);
+
+	upperarm_r = CreateDefaultSubobject<UBoxComponent>(TEXT("upperarm_r"));
+	upperarm_r->SetupAttachment(GetMesh(), FName("upperarm_r"));
+	upperarm_r->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("upperarm_r"), upperarm_r);
+
+	lowerarm_l = CreateDefaultSubobject<UBoxComponent>(TEXT("lowerarm_l"));
+	lowerarm_l->SetupAttachment(GetMesh(), FName("lowerarm_l"));
+	lowerarm_l->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("lowerarm_l"), lowerarm_l);
+
+	lowerarm_r = CreateDefaultSubobject<UBoxComponent>(TEXT("lowerarm_r"));
+	lowerarm_r->SetupAttachment(GetMesh(), FName("lowerarm_r"));
+	lowerarm_r->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("lowerarm_r"), lowerarm_r);
+
+	hand_l = CreateDefaultSubobject<UBoxComponent>(TEXT("hand_l"));
+	hand_l->SetupAttachment(GetMesh(), FName("hand_l"));
+	hand_l->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("hand_l"), hand_l);
+
+	hand_r = CreateDefaultSubobject<UBoxComponent>(TEXT("hand_r"));
+	hand_r->SetupAttachment(GetMesh(), FName("hand_r"));
+	hand_r->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("hand_r"), hand_r);
+
+	backpack = CreateDefaultSubobject<UBoxComponent>(TEXT("backpack"));
+	backpack->SetupAttachment(GetMesh(), FName("backpack"));
+	backpack->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("backpack"), backpack);
+
+	blanket = CreateDefaultSubobject<UBoxComponent>(TEXT("blanket"));
+	blanket->SetupAttachment(GetMesh(), FName("backpack"));
+	blanket->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("blanket"), blanket);
+
+	thigh_l = CreateDefaultSubobject<UBoxComponent>(TEXT("thigh_l"));
+	thigh_l->SetupAttachment(GetMesh(), FName("thigh_l"));
+	thigh_l->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("thigh_l"), thigh_l);
+
+	thigh_r = CreateDefaultSubobject<UBoxComponent>(TEXT("thigh_r"));
+	thigh_r->SetupAttachment(GetMesh(), FName("thigh_r"));
+	thigh_r->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("thigh_r"), thigh_r);
+
+	calf_l = CreateDefaultSubobject<UBoxComponent>(TEXT("calf_l"));
+	calf_l->SetupAttachment(GetMesh(), FName("calf_l"));
+	calf_l->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("calf_l"), calf_l);
+
+	calf_r = CreateDefaultSubobject<UBoxComponent>(TEXT("calf_r"));
+	calf_r->SetupAttachment(GetMesh(), FName("calf_r"));
+	calf_r->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("calf_r"), calf_r);
+
+	foot_l = CreateDefaultSubobject<UBoxComponent>(TEXT("foot_l"));
+	foot_l->SetupAttachment(GetMesh(), FName("foot_l"));
+	foot_l->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("foot_l"), foot_l);
+
+	foot_r = CreateDefaultSubobject<UBoxComponent>(TEXT("foot_r"));
+	foot_r->SetupAttachment(GetMesh(), FName("foot_r"));
+	foot_r->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HitCollisionBoxes.Add(FName("foot_r"), foot_r);
+}
+
 void ABlasterCharacter::Destroyed()
 {
 	Super::Destroyed();
@@ -87,9 +189,9 @@ void ABlasterCharacter::MulticastGainTheLead_Implementation()
 	{
 		CrownComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
 			CrownSystem,
-			GetCapsuleComponent(),
+			GetMesh(),
 			FName(),
-			GetActorLocation() + FVector(0.f, 0.f, 100.f),
+			GetActorLocation() + FVector(0.f, 0.f, 120.f),
 			GetActorRotation(),
 			EAttachLocation::KeepWorldPosition,
 			false);
@@ -111,6 +213,14 @@ void ABlasterCharacter::MulticastLostTheLead_Implementation()
 void ABlasterCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	/*// test
+	FFramePackage Package;
+	if (LagCompensation)
+	{
+		LagCompensation->SaveFramePackage(Package);
+		LagCompensation->ShowFramePackage(Package, FColor::Orange);
+	}*/
+	
 	// tood 在哪可以set
 	GetMovementComponent()->NavAgentProps.bCanCrouch = true;
 
@@ -135,6 +245,26 @@ void ABlasterCharacter::BeginPlay()
 void ABlasterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	/*if (HasAuthority())
+	{
+		FString ModeName = UGameplayStatics::GetGameMode(this)->GetName();
+		DebugUtil::PrintMsg(ModeName, FColor::Red);
+	}*/
+	
+	/*if (GetBlasterPlayerState())
+	{
+		FString Msg("None");
+		if (GetBlasterPlayerState()->GetTeam() == ETeam::ET_TeamBlue)
+		{
+			Msg = FString("Blue");
+		} else if (GetBlasterPlayerState()->GetTeam() == ETeam::ET_TeamRed)
+		{
+			Msg = FString("Red");
+		}
+		DebugUtil::PrintMsg(Msg, FColor::Purple);
+	}*/
+	
 	// 1. 使用AimOffset  only for player controlling the character
 	// 2. 使用SImProxyTurn   for simProxy or character not controlled on server 
 	if (GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
@@ -179,6 +309,14 @@ void ABlasterCharacter::PostInitializeComponents()
 		Buff->SetInitialSpeed(GetCharacterMovement()->MaxWalkSpeed,
 							GetCharacterMovement()->MaxWalkSpeedCrouched);
 		Buff->SetInitialJumpVelocity(GetCharacterMovement()->JumpZVelocity);
+	}
+	if (LagCompensation)
+	{
+		LagCompensation->Character = this;
+		if (Controller)
+		{
+			LagCompensation->Controller = Cast<ABlasterPlayerController>(Controller);
+		}
 	}
 }
 
@@ -290,6 +428,12 @@ FVector ABlasterCharacter::GetHitTarget() const
 	return Combat->HitTarget;
 }
 
+bool ABlasterCharacter::IsLocallyReloading()
+{
+	if (!Combat)	return false;
+	return Combat->bLocallyReloading;
+}
+
 ECombatState ABlasterCharacter::GetCombatState() const
 {
 	if (Combat == nullptr)	return ECombatState::ECS_UnOccupied;
@@ -327,6 +471,8 @@ void ABlasterCharacter::DropOrDestroyWeapons()
 	{
 		Combat->DropOrDestroyWeapon(Combat->EquippedWeapon);
 		Combat->DropOrDestroyWeapon(Combat->SecondaryWeapon);
+		Combat->EquippedWeapon = nullptr;
+		Combat->SecondaryWeapon = nullptr;
 	}
 }
 
@@ -346,7 +492,7 @@ void ABlasterCharacter::PollInit()
 		{
 			BlasterPlayerState->AddToScore(0.f);
 			BlasterPlayerState->AddToDefeats(0);
-
+			SetTeamColor(BlasterPlayerState->GetTeam());
 			ABlasterGameState* BlasterGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
 			if (BlasterGameState && BlasterGameState->TopScorePlayer.Contains(BlasterPlayerState))
 			{
@@ -354,6 +500,7 @@ void ABlasterCharacter::PollInit()
 			}
 		}
 	}
+	
 }
 
 void ABlasterCharacter::ServerLeaveGame_Implementation()
@@ -537,11 +684,12 @@ void ABlasterCharacter::HoverButtonPressed()
 void ABlasterCharacter::ServerHoverButtonPressed_Implementation()
 {
 	bHovering = !bHovering;
+	//  类似pubg 的 alt
 }
 
 void ABlasterCharacter::OnRep_bHovering()
 {
-	
+
 }
 
 void ABlasterCharacter::EquipButtonPressed()
@@ -551,10 +699,7 @@ void ABlasterCharacter::EquipButtonPressed()
 
 void ABlasterCharacter::DropButtonPressed()
 {
-	if (Combat && Combat->EquippedWeapon)
-	{
-		Combat->DropWeapon();
-	}
+	ServerDropButtonPressed();
 }
 
 void ABlasterCharacter::CrouchButtonPressed()
@@ -756,12 +901,37 @@ void ABlasterCharacter::PlayHitReactMontage()
 	}
 }
 
+void ABlasterCharacter::SetTeamColor(ETeam TeamToSet)
+{
+	DebugUtil::PrintMsg(FString::Printf(TEXT("SetTeamColor")), FColor::Green);
+	switch (TeamToSet)
+		{
+		case ETeam::ET_None:
+			GetMesh()->SetMaterial(0, OriginalMaterial);
+			DissolveMaterialInstance = BlueDissolveMatInst;
+			break;
+		case ETeam::ET_TeamBlue:
+			GetMesh()->SetMaterial(0, BlueMaterial);
+			DissolveMaterialInstance = BlueDissolveMatInst;
+			break;
+		case ETeam::ET_TeamRed:
+			GetMesh()->SetMaterial(0, RedMaterial);
+			DissolveMaterialInstance = RedDissolveMatInst;
+			break;
+		default:
+			GetMesh()->SetMaterial(0, OriginalMaterial);
+			DissolveMaterialInstance = BlueDissolveMatInst;
+			break;		
+	}
+}
+
 // bind this to delegate onTakenAnyDamage, and only on the server
 void ABlasterCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,
 	AController* InstigatorController, AActor* DamageCauser)
 {
-	if (bElimmed)	return;
-	float DamageToApply = Damage;
+	if (bElimmed || !GetBlasterGameMode())	return;
+	
+	float DamageToApply = GetBlasterGameMode()->CalculateDamage(InstigatorController, GetController(), Damage);
 	if (Shield >= DamageToApply)
 	{
 		Shield = FMath::Clamp(Shield - Damage, 0.f, MaxShield);
@@ -782,15 +952,45 @@ void ABlasterCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const 
 	} 
 }
 
+// todo 这里需要改。有关client swap weapon的bug
+/***
+ * Equip Weapon
+ * 1. Overlap == nullptr
+ *		1) canSwap  -> Swap
+ *		2) can't swap -> return
+ * 2. Overlap is not null
+ *		1) no weapon -> equip
+ *		2) one weapon -> equip overlapWeapon and swap current weapon to secondary weapon
+ *		3) two weapon -> drop secondary weapon and equip overlap to secondary
+ */
 void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 {
 	if (!Combat)	return;
-	if (Combat->ShouldSwapWeapon())
-	{
-		Combat->SwapWeapons();
-	} else if (OverlappingWeapon)
+	if (OverlappingWeapon)
 	{
 		Combat->EquipWeapon(OverlappingWeapon);
+		/*if (Combat->EquippedWeapon == nullptr)	 // 2.1
+		{
+			Combat->EquipWeapon(OverlappingWeapon);
+		} else if (Combat->EquippedWeapon != nullptr && Combat->SecondaryWeapon == nullptr)
+		{
+			
+		} else if (Combat->EquippedWeapon != nullptr && Combat->SecondaryWeapon != nullptr)
+		{
+			
+		}*/
+	} else	// 无 Overlap Weapon且 可以切换武器
+	{
+		if (Combat->CanSwapWeapon())
+		{
+			Combat->SwapWeapons();
+		} else if (Combat->EquippedWeapon == nullptr && Combat->SecondaryWeapon != nullptr)
+		{
+			Combat->TakeSecondaryWeapon();
+		} else if (Combat->EquippedWeapon != nullptr && Combat->SecondaryWeapon == nullptr)
+		{
+			Combat->PutSecondaryWeapon();
+		}
 	}
 }
 
@@ -835,6 +1035,14 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 	Super::OnRep_ReplicatedMovement();
 	SimProxiesTurn();
 	TimeSinceLastReplication = 0.f;
+}
+
+void ABlasterCharacter::ServerDropButtonPressed_Implementation()
+{
+	if (Combat && Combat->EquippedWeapon)
+	{
+		Combat->DropWeapon();
+	}
 }
 
 void ABlasterCharacter::SetCharacterVisibility(bool bVisiable)

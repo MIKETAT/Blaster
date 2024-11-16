@@ -17,6 +17,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Sound/SoundCue.h"
 #include "Blaster/Weapon/Projectile.h"
+#include "Blaster/Weapon/Shotgun.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -47,10 +48,11 @@ void UCombatComponent::BeginPlay()
 			DefaultFOV = Character->GetFollowCamera()->FieldOfView;
 			CurrentFOV = DefaultFOV;
 		}
-	}
-	if (Character->HasAuthority())
-	{
-		InitWeaponAmmo();
+		InitWeaponAmmo();// todo 在client初始化可以吗，涉及到需要和server同步。因为这里本地的HUD显示弹药需要这个
+		/*if (Character->HasAuthority())
+		{
+			
+		}*/
 	}
 	SpawnDefaultWeapon();
 }
@@ -119,6 +121,14 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 	}
 }
 
+void UCombatComponent::OnRep_bIsAiming()
+{
+	if (Character && Character->IsLocallyControlled())
+	{
+		bIsAiming = bAimingButtonPressed;	// client本地是否isAim取决于当前AimButtonPressed是否为true,避免lag时同步导致的本地not pressed, 但是同步过来是Pressed状态
+	}
+}
+
 void UCombatComponent::OnRep_CarriedAmmo()
 {
 	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
@@ -155,7 +165,7 @@ void UCombatComponent::OnRep_CombatState()
 			}
 			break;
 		case ECombatState::ECS_Reloading:
-			HandleReload();
+			if (Character && !Character->IsLocallyControlled())	HandleReload();
 			break;
 		case ECombatState::ECS_ThrowingGrenade:
 			if (Character && !Character->IsLocallyControlled())
@@ -193,11 +203,72 @@ void UCombatComponent::Fire()
 	}
 	if (!CanFire())		return;
 	// 开火
-	
 	EquippedWeapon->SetWeaponFireStatus(false);	// 开火执行时不能同时开火
-	ServerFire(HitTarget);
+	switch (EquippedWeapon->FireType)
+	{
+	case EFireType::EFT_Projectile:
+			FireProjectileWeapon();
+			break;
+		case EFireType::EFT_HitScan:
+			FireHitScanWeapon();
+			break;
+		case EFireType::EFT_Shotgun:
+			FireShotgun();
+			break;
+		default:
+			break;
+	}
 	CrosshairShootingFactor = FMath::Max(CrosshairShootingFactor + 0.2f, 1.f);
 	StartFireTimer();
+}
+
+void UCombatComponent::LocalFire(const FVector_NetQuantize& TraceHitTarget)
+{
+	if (EquippedWeapon == nullptr)	return;
+	if (Character && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
+	{
+		Character->PlayFireMontage(bIsAiming);
+		EquippedWeapon->Fire(TraceHitTarget);
+		CombatState = ECombatState::ECS_UnOccupied;
+		return;
+	}
+	if (Character && CombatState == ECombatState::ECS_UnOccupied)
+	{
+		Character->PlayFireMontage(bIsAiming);
+		EquippedWeapon->Fire(TraceHitTarget);
+	}
+	/*if (Character->HasAuthority())
+	{
+		DebugUtil::PrintMsg("Server TraceHitTarget " + TraceHitTarget.ToString(), FColor::Red);
+	} else
+	{
+		DebugUtil::PrintMsg("Client TraceHitTarget " + TraceHitTarget.ToString(), FColor::Red);
+	}*/
+}
+
+
+void UCombatComponent::ShotgunLocalFire(const TArray<FVector_NetQuantize>& HitTargets)
+{
+	AShotgun* Shotgun = Cast<AShotgun>(EquippedWeapon);
+	if (!Shotgun || !Character)	return;
+	if (CombatState == ECombatState::ECS_Reloading || CombatState == ECombatState::ECS_UnOccupied)
+	{
+		Character->PlayFireMontage(bIsAiming);
+		Shotgun->FireShotgun(HitTargets);
+		CombatState = ECombatState::ECS_UnOccupied;
+	}
+}	
+
+void UCombatComponent::ShotgunServerFire(const TArray<FVector_NetQuantize>& HitTargets)
+{
+	MulticastShotgunFire(HitTargets);
+}
+
+void UCombatComponent::MulticastShotgunFire_Implementation(const TArray<FVector_NetQuantize>& HitTargets)
+{
+	// 客户端本地自己操控的角色已经调用了LocalFire, 不必再通过网络同步调用一次LocalFire
+	if (Character && Character->IsLocallyControlled() && !Character->HasAuthority())	return;
+	ShotgunLocalFire(HitTargets);
 }
 
 void UCombatComponent::StartFireTimer()
@@ -222,25 +293,18 @@ void UCombatComponent::FireTimerFinished()
 	AutoReloadEmptyWeapon();
 }
 
-// todo reload的动画需要改，只上半身reload，不影响下半身，不会改变状态(蹲下->站起)这种
-void UCombatComponent::HandleReload()
-{
-	CombatState = ECombatState::ECS_Reloading;
-	Character->PlayReloadMontage();
-}
-
-// 更新子弹HUD
+// 更新子弹HUD. 
 void UCombatComponent::UpdateAmmoHUD()
 {
 	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
 	if (Controller == nullptr)	return;
-	if (EquippedWeapon && CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
-	{
-		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
-		Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
-	} else
+	if (EquippedWeapon == nullptr || !CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
 		Controller->SetHUDAmmo(0, 0);
+	} else
+	{
+		//CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+		Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 	}
 }
 
@@ -248,7 +312,7 @@ void UCombatComponent::UpdateAmmoHUD()
 // reload the ammo
 void UCombatComponent::ReloadAmmo()
 {
-	if (Character == nullptr || EquippedWeapon == nullptr)	return;
+	if (Character == nullptr || EquippedWeapon == nullptr || CarriedAmmo <= 0)	return;
 	int32 ReloadAmount = AmountToReload();
 	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
@@ -339,10 +403,49 @@ int32 UCombatComponent::AmountToReload()
 
 void UCombatComponent::Reload()
 {
-	if (EquippedWeapon == nullptr || EquippedWeapon->GetAmmo() >= EquippedWeapon->GetMaxCapacity())	return;
-	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_UnOccupied)
+	if (EquippedWeapon == nullptr || EquippedWeapon->IsFull())	return;
+	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_UnOccupied && !bLocallyReloading)
 	{
 		ServerReload();
+		HandleReload();
+		bLocallyReloading = true;
+	}
+}
+
+void UCombatComponent::ServerReload_Implementation()
+{
+	if (Character == nullptr || EquippedWeapon == nullptr)	return;
+	CombatState = ECombatState::ECS_Reloading;
+	if (!Character->IsLocallyControlled())		// todo OnRep里还能理解，这里的含义是client上非本地控制的意思还是server上的？
+	{
+		HandleReload();
+	}
+}
+
+// todo reload的动画需要改，只上半身reload，不影响下半身，不会改变状态(蹲下->站起)这种
+void UCombatComponent::HandleReload()
+{
+	CombatState = ECombatState::ECS_Reloading;
+	if (Character)
+	{
+		Character->PlayReloadMontage();	
+	}
+}
+
+void UCombatComponent::FinishReloading()
+{
+	if (Character == nullptr)	return;
+	bLocallyReloading = false;
+	// 重要变量的变化，例如状态的变化都在server执行
+	if (Character->HasAuthority())
+	{
+		CombatState = ECombatState::ECS_UnOccupied;
+		ReloadAmmo();
+	}
+	// 换弹完成，仍按住了开火
+	if (bFireButtonPressed)
+	{
+		Fire();
 	}
 }
 
@@ -388,12 +491,6 @@ void UCombatComponent::ServerThrowGrenade_Implementation()
 	UpdateGrenades();
 }
 
-void UCombatComponent::ServerReload_Implementation()
-{
-	if (Character == nullptr || EquippedWeapon == nullptr)	return;
-	HandleReload();
-}
-
 void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
 	MulticastFire(TraceHitTarget);
@@ -401,19 +498,9 @@ void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& Trac
 
 void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
-	if (EquippedWeapon == nullptr)	return;
-	if (Character && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
-	{
-		Character->PlayFireMontage(bIsAiming);
-		EquippedWeapon->Fire(TraceHitTarget);
-		CombatState = ECombatState::ECS_UnOccupied;
-		return;
-	}
-	if (Character && CombatState == ECombatState::ECS_UnOccupied)
-	{
-		Character->PlayFireMontage(bIsAiming);
-		EquippedWeapon->Fire(TraceHitTarget);
-	}
+	// 客户端本地自己操控的角色已经调用了LocalFire, 不必再通过网络同步调用一次LocalFire
+	if (Character && Character->IsLocallyControlled() && !Character->HasAuthority())	return;
+	LocalFire(TraceHitTarget);
 }
 
 /**
@@ -485,6 +572,10 @@ void UCombatComponent::SetAiming(bool isAiming)
 		Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Character->Controller) : Controller;
 		Controller->SetHUDSniperScope(bIsAiming);
 	}
+	if (Character->IsLocallyControlled())
+	{
+		bAimingButtonPressed = isAiming;
+	}
 }
 
 void UCombatComponent::ServerSetAiming_Implementation(bool isAiming)
@@ -539,6 +630,7 @@ void UCombatComponent::OnRep_EquippedWeapon(AWeapon* LastWeapon)	// todo LastWea
 	if (Character->IsLocallyControlled() && HUD)
 	{
 		HUD->SetHUDCrosshairEnabled(EquippedWeapon != nullptr);
+		UpdateAmmoHUD();
 	}
 }
 
@@ -581,7 +673,7 @@ void UCombatComponent::SpawnDefaultWeapon()
 	UWorld* World = GetWorld();
 	if (!BlasterGameMode || !World || !Character || !Character->GetCombat())	return;
 	AWeapon* DefaultWeapon = World->SpawnActor<AWeapon>(DefaultWeaponClass);
-	Character->GetCombat()->EquipWeapon(DefaultWeapon);
+	EquipWeapon(DefaultWeapon);
 	DefaultWeapon->SetIsDefaultWeapon(true);
 }
 
@@ -590,6 +682,7 @@ void UCombatComponent::DropEquippedWeapon()
 	if (EquippedWeapon)
 	{
 		EquippedWeapon->Drop();	// 已有武器则扔掉替换
+		EquippedWeapon = nullptr;
 	}
 	UpdateAmmoHUD();
 }
@@ -660,43 +753,46 @@ void UCombatComponent::AutoReloadEmptyWeapon()
 }
 
 // only on server
+/**
+ * 1. no weapon
+ * 2. already have one
+ * 3. have two weapons
+ */
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 {
-	if (!Character || !WeaponToEquipped)				return;
-	if (CombatState != ECombatState::ECS_UnOccupied)	return;
-
-	if (EquippedWeapon != nullptr && SecondaryWeapon == nullptr)
+	if (!Character || !WeaponToEquipped || CombatState != ECombatState::ECS_UnOccupied)	return;
+	if (EquippedWeapon == nullptr)
+	{
+		EquipPrimitiveWeapon(WeaponToEquipped);
+	} else if (EquippedWeapon != nullptr && SecondaryWeapon == nullptr)
 	{
 		EquipSecondaryWeapon(WeaponToEquipped);
 	} else
 	{
-		EquipPrimitiveWeapon(WeaponToEquipped);
+		DropCurrentWeaponAndEquipAnotherOne(WeaponToEquipped);
 	}
 	Character->GetCharacterMovement()->bOrientRotationToMovement = false;	// 禁用面向移动方向
 	Character->bUseControllerRotationYaw = true;	// Pawn的yaw等于controller的yaw
+	UpdateAmmoHUD();
 }
 
 void UCombatComponent::DropWeapon()
 {
 	if (!EquippedWeapon)	return;
-	if (SecondaryWeapon)
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
-		SwapWeapons();
-		SecondaryWeapon->Drop();
-		SecondaryWeapon = nullptr;
-	} else
-	{
-		EquippedWeapon->Drop();
-		EquippedWeapon = nullptr;
-		HUD->SetHUDCrosshairEnabled(false);
+		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] = CarriedAmmo;
+		CarriedAmmo = 0;
 	}
+	EquippedWeapon->Drop();
+	EquippedWeapon = nullptr;
 	UpdateAmmoHUD();
 }
 
 void UCombatComponent::EquipPrimitiveWeapon(AWeapon* WeaponToEquip)
 {
 	if (WeaponToEquip == nullptr)	return;
-	DropEquippedWeapon();
+	//DropEquippedWeapon();
 	EquippedWeapon = WeaponToEquip;
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 	
@@ -711,49 +807,82 @@ void UCombatComponent::EquipPrimitiveWeapon(AWeapon* WeaponToEquip)
 	{
 		CarriedAmmo = 0;
 	}
-	UpdateAmmoHUD();
 	PlayEquipWeaponSound(EquippedWeapon);
 	AutoReloadEmptyWeapon();
+	UpdateAmmoHUD();
+	DebugUtil::PrintMsg(TEXT("Equip Primitive Weapon"));
 }
 
 void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
 {
 	if (WeaponToEquip == nullptr)	return;
-
 	SecondaryWeapon = WeaponToEquip;
 	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
 	AttachActorToBackpack(SecondaryWeapon);
 	PlayEquipWeaponSound(SecondaryWeapon);
 	SecondaryWeapon->SetOwner(Character);
+	SecondaryWeapon->ShowPickupWidget(false);
 	if (SecondaryWeapon->GetWeaponMesh())
 	{
 		SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
 		SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();	// todo 研究一下
 	}
+	DebugUtil::PrintMsg(TEXT("Equip Secondary Weapon"));
 }
 
-bool UCombatComponent::ShouldSwapWeapon() const
+void UCombatComponent::DropCurrentWeaponAndEquipAnotherOne(AWeapon* WeaponToEquip)
 {
-	{
-		return	Character && !Character->GetOverlappingWeapon() &&
-				EquippedWeapon && SecondaryWeapon &&
-				EquippedWeapon->bCanFire;
-	}
+	if (WeaponToEquip == nullptr || EquippedWeapon == nullptr)	return;
+	DropWeapon();
+	EquipPrimitiveWeapon(WeaponToEquip);
 }
 
 void UCombatComponent::SwapWeapons()
 {
-	if (!EquippedWeapon)	return;
+	if (!EquippedWeapon || !SecondaryWeapon || CombatState != ECombatState::ECS_UnOccupied)		return;
 	AWeapon* TempWeapon = EquippedWeapon;
+	// Update CarriedAmmo
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmoMap[EquippedWeapon->GetWeaponType()] = CarriedAmmo;
+	}
 	EquippedWeapon = SecondaryWeapon;
 	AttachActorToRightHand(EquippedWeapon);
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+	}
 	SecondaryWeapon = TempWeapon;
 	AttachActorToBackpack(SecondaryWeapon);
 	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
 	PlayEquipWeaponSound(EquippedWeapon);
 	AutoReloadEmptyWeapon();
 	UpdateAmmoHUD();
+	DebugUtil::PrintMsg(FString("Now First Weapon is " + EquippedWeapon->GetName()), FColor::Red);
+	DebugUtil::PrintMsg(FString("Now Second Weapon is " + SecondaryWeapon->GetName()), FColor::Red);
+}
+
+// 无枪时掏出第二把枪
+void UCombatComponent::TakeSecondaryWeapon()
+{
+	DebugUtil::PrintMsg(TEXT("TakeSecondaryWeapon"));
+	if (EquippedWeapon != nullptr || SecondaryWeapon == nullptr)	return;
+	AWeapon* TempWeapon = SecondaryWeapon;
+	SecondaryWeapon->Drop();
+	EquipPrimitiveWeapon(TempWeapon);
+	SecondaryWeapon = nullptr;
+}
+
+void UCombatComponent::PutSecondaryWeapon()
+{
+	DebugUtil::PrintMsg(TEXT("PutSecondaryWeapon"));
+	if (EquippedWeapon == nullptr || SecondaryWeapon != nullptr)	return;
+	AWeapon* TempWeapon = EquippedWeapon;
+	EquippedWeapon->Drop();
+	EquipSecondaryWeapon(TempWeapon);
+	EquippedWeapon = nullptr;
+	
 }
 
 bool UCombatComponent::CanFire() const
@@ -767,23 +896,8 @@ bool UCombatComponent::CanFire() const
 	}
 	// shotgun在换弹时也可开火
 	if (EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun && CombatState == ECombatState::ECS_Reloading)	return true;
+	if (bLocallyReloading)		return false;
 	return CombatState == ECombatState::ECS_UnOccupied;
-}
-
-void UCombatComponent::FinishReloading()
-{
-	if (Character == nullptr)	return;
-	// 重要变量的变化，例如状态的变化都在server执行
-	if (Character->HasAuthority())
-	{
-		CombatState = ECombatState::ECS_UnOccupied;
-		ReloadAmmo();
-	}
-	// 换弹完成，仍按住了开火
-	if (bFireButtonPressed)
-	{
-		Fire();
-	}
 }
 
 void UCombatComponent::ShotgunShellReload()
@@ -797,6 +911,7 @@ void UCombatComponent::ShotgunShellReload()
 void UCombatComponent::JumpToShotgunEnd()
 {
 	// Jump to ShotgunEnd
+	if (Character == nullptr || Character->GetMesh() == nullptr)	return;
 	UAnimInstance* AnimInstance = Character->GetMesh()->GetAnimInstance();
 	if (AnimInstance && Character->GetReloadMontage())
 	{
@@ -817,6 +932,47 @@ void UCombatComponent::LaunchGrenade()
 	{
 		ServerLaunchGrenade(HitTarget);
 	}
+}
+
+void UCombatComponent::FireHitScanWeapon()
+{
+	//DebugUtil::PrintMsg(FString(TEXT("EFT_HitScan")), FColor::Blue);
+	if (EquippedWeapon)
+	{
+		HitTarget = EquippedWeapon->bUseScatter ? EquippedWeapon->TraceEndWithScatter(HitTarget) : HitTarget;
+		LocalFire(HitTarget);
+		ServerFire(HitTarget);
+	}
+}
+
+// for assault rifle
+void UCombatComponent::FireProjectileWeapon()
+{
+	//DebugUtil::PrintMsg(FString(TEXT("EFT_Projectile")), FColor::Blue);
+	if (EquippedWeapon)
+	{
+		HitTarget = EquippedWeapon->bUseScatter ? EquippedWeapon->TraceEndWithScatter(HitTarget) : HitTarget;
+		if (!Character->HasAuthority())
+		{
+			LocalFire(HitTarget);
+		}	
+		ServerFire(HitTarget);
+	}
+}
+
+// Calc hit results locally
+void UCombatComponent::FireShotgun()
+{
+	//DebugUtil::PrintMsg(FString(TEXT("EFT_Shotgun")), FColor::Blue);
+	AShotgun* Shotgun = Cast<AShotgun>(EquippedWeapon);
+	if (!Shotgun)	return;
+	TArray<FVector_NetQuantize> HitTargets;
+	Shotgun->ShotgunTraceWithScatter(HitTarget, HitTargets);
+	if (!Character->HasAuthority())
+	{
+		ShotgunLocalFire(HitTargets);
+	}
+	ShotgunServerFire(HitTargets);
 }
 
 void UCombatComponent::ServerLaunchGrenade_Implementation(const FVector_NetQuantize& Target)
