@@ -94,7 +94,7 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWeapon, WeaponState);
-	//DOREPLIFETIME(AWeapon, Ammo);
+	DOREPLIFETIME_CONDITION(AWeapon, bUseServerSideRewind, COND_OwnerOnly);
 }
 
 void AWeapon::Fire(const FVector& HitTarget)
@@ -186,6 +186,7 @@ void AWeapon::OnEquip()
 	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetWeaponPhysicsAndCollision(false);
 	EnableCustomDepth(false);
+	BindOrRemoveHighPingDelegate(true);
 }
 
 void AWeapon::OnDrop()
@@ -198,6 +199,7 @@ void AWeapon::OnDrop()
 	WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_BLUE);
 	WeaponMesh->MarkRenderStateDirty();	// force a refresh
 	EnableCustomDepth(true);
+	BindOrRemoveHighPingDelegate(false);
 }
 
 void AWeapon::OnEquipSecondary()
@@ -206,9 +208,14 @@ void AWeapon::OnEquipSecondary()
 	SetWeaponPhysicsAndCollision(false);
 	WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
 	WeaponMesh->MarkRenderStateDirty();	// force a refresh
-	EnableCustomDepth(true);
+	//EnableCustomDepth(true);
+	BindOrRemoveHighPingDelegate(false);
 }
 
+void AWeapon::OnPingTooHigh(bool bPingTooHigh)
+{
+	bUseServerSideRewind = !bPingTooHigh;
+}
 
 void AWeapon::OnWeaponStateChange()
 {
@@ -347,4 +354,19 @@ FVector AWeapon::TraceEndWithScatter(const FVector& TraceTarget)
 	FVector RandomEnd = SphereCenter + RandomVec;
 	FVector ToTraceEnd = RandomEnd - TraceStart;
 	return FVector(TraceStart + TRACE_LENGTH * ToTraceEnd / ToTraceEnd.Size());
+}
+
+void AWeapon::BindOrRemoveHighPingDelegate(bool bBind)
+{
+	BlasterOwner = BlasterOwner == nullptr ? Cast<ABlasterCharacter>(GetOwner()) : BlasterOwner;
+	if (!BlasterOwner)	return;
+	BlasterController = BlasterController == nullptr ? Cast<ABlasterPlayerController>(BlasterOwner->Controller) : BlasterController;
+	if (!BlasterController || !HasAuthority())	return;
+	if (bBind && !BlasterController->HighPingDelegate.IsBound())
+	{
+		BlasterController->HighPingDelegate.AddDynamic(this, &AWeapon::AWeapon::OnPingTooHigh);
+	} else if (!bBind && BlasterController->HighPingDelegate.IsBound())
+	{
+		BlasterController->HighPingDelegate.RemoveDynamic(this, &AWeapon::AWeapon::OnPingTooHigh);
+	}
 }

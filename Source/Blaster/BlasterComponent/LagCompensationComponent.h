@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blaster/Character/BlasterCharacter.h"
 #include "Components/ActorComponent.h"
 #include "LagCompensationComponent.generated.h"
 
@@ -27,10 +28,16 @@ struct FFramePackage
 	GENERATED_BODY()
 
 	UPROPERTY()
-	float Time;
+	float Time = 0.f;
 
 	UPROPERTY()
 	TMap<FName, FBoxInfo> HitBoxInfo;
+
+	UPROPERTY()
+	class ABlasterCharacter* BlasterCharacter = nullptr;
+
+	UPROPERTY()
+	bool bValidFrame = false;
 };
 
 USTRUCT(BlueprintType)
@@ -60,6 +67,18 @@ public:
 	} 
 };
 
+USTRUCT(BlueprintType)
+struct FShotgunServerSideRewindResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TMap<ABlasterCharacter*, uint32> HeadShots;
+
+	UPROPERTY()
+	TMap<ABlasterCharacter*, uint32> BodyShots;
+};
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class BLASTER_API ULagCompensationComponent : public UActorComponent
 {
@@ -71,18 +90,51 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	void ShowFramePackage(const FFramePackage& Package, const FColor& Color);
 	void SaveFramePackage(FFramePackage& Package);
-	FServerSideRewindResult ServerSideRewind(class ABlasterCharacter* HitCharacter, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize& HitLocation, const float HitTime);
+	
 	FFramePackage InterpFrame(const FFramePackage& OlderFrame, const FFramePackage& YoungerFrame, float HitTime);
+	FFramePackage GetCheckFrame(ABlasterCharacter* HitCharacter, const float HitTime);
 	void SaveFrame();
 	UFUNCTION(Server, Reliable)
 	void ServerRequestScore(ABlasterCharacter* HitCharacter, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize& HitLocation, const float HitTime, class AWeapon* DamageCauser);
+
+	UFUNCTION(Server, Reliable)
+	void ShotgunServerRequestScore(const TArray<ABlasterCharacter*>& HitCharacters, const FVector_NetQuantize& TraceStart, const TArray<FVector_NetQuantize>& HitLocations, const float HitTime, AWeapon* DamageCauser);
+
+	UFUNCTION(Server, Reliable)
+	void ProjectileServerRequestScore(ABlasterCharacter* HitCharacter, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize100& InitialVelocity, const float HitTime);
 protected:
 	virtual void BeginPlay() override;
 	void CacheCurrentFrame(ABlasterCharacter* HitCharacter, FFramePackage& OutFramePackage);
 	void MoveToPosition(ABlasterCharacter* HitCharacter, const FFramePackage& Position, bool bReset);
 	void EnableCharacterMeshCollision(ABlasterCharacter* HitCharacter, const ECollisionEnabled::Type Type);
 	void ResetPositionAndCollision(ABlasterCharacter* HitCharacter, const FFramePackage& CurrentFrame);
-	FServerSideRewindResult ConfirmRewindResult(const FFramePackage& CheckFrame, ABlasterCharacter* HitCharacter, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize& HitLocation);
+
+	/**
+	 * HitScan
+	 */
+	FServerSideRewindResult ConfirmRewindResult(const FFramePackage& CheckFrame, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize& HitLocation);
+	FServerSideRewindResult ServerSideRewind(ABlasterCharacter* HitCharacter, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize& HitLocation, const float HitTime);
+
+	/**
+	 * Shotgun
+	 */
+	FShotgunServerSideRewindResult ShotgunConfirmRewindResult(
+		const TArray<FFramePackage>& CheckFrames,
+		const FVector_NetQuantize& TraceStart,
+		const TArray<FVector_NetQuantize>& HitLocations);
+	
+	FShotgunServerSideRewindResult ShotgunServerSideRewind(
+		const TArray<ABlasterCharacter*>& HitCharacters,
+		const FVector_NetQuantize& TraceStart,
+		const TArray<FVector_NetQuantize>& HitLocations,
+		const float HitTime);
+
+	/**
+	 * Projectile
+	 */
+	FServerSideRewindResult ProjectileConfirmRewindResult(const FFramePackage& CheckFrame, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize100& InitialVelocity, const float HitTime);
+	FServerSideRewindResult ProjectileServerSideRewind(ABlasterCharacter* HitCharacter, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize100& InitialVelocity, const float HitTime);
+	
 private:
 	UPROPERTY()
 	ABlasterCharacter* Character;

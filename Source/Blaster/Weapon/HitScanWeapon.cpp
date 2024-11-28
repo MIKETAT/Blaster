@@ -16,7 +16,7 @@
 void AHitScanWeapon::Fire(const FVector& HitTarget) 
 {
 	Super::Fire(HitTarget);
-
+	DebugUtil::PrintMsg(FString::Printf(TEXT("HitScanWeapon Firing")));
 	APawn* InstigatorOwner = Cast<APawn>(GetOwner());
 	if (InstigatorOwner == nullptr)	return;
 	APlayerController* InstigatorController = Cast<APlayerController>(InstigatorOwner->GetController());
@@ -41,7 +41,8 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 			{
 				float DamageToCause = HitResult.BoneName == FString("head") ? HeadShotDamage : Damage;
 				// todo 这里的四种情况, server/client + rewind/not rewind 需要考虑, 特别是 server上使用rewind 或者client 不使用rewind两种
-				if (HasAuthority() && !bUseServerSideRewind)	// todo 与教程不一致, 这样似乎更合理
+				bool bUseAuthDamage = !bUseServerSideRewind || BlasterOwner->IsLocallyControlled();
+				if (HasAuthority() && bUseAuthDamage)	
 				{
 					DebugUtil::PrintMsg(TEXT("Apply Damage Directly"));
 					UGameplayStatics::ApplyDamage(
@@ -56,7 +57,7 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 				{
 					BlasterOwner = BlasterOwner == nullptr ? Cast<ABlasterCharacter>(InstigatorOwner) : BlasterOwner;
 					BlasterController = BlasterController == nullptr ? Cast<ABlasterPlayerController>(InstigatorController) : BlasterController;
-					if (BlasterOwner && BlasterController && BlasterOwner->GetLagCompensationComponent())
+					if (BlasterOwner && BlasterController && BlasterOwner->GetLagCompensationComponent() && BlasterOwner->IsLocallyControlled())
 					{
 						DebugUtil::PrintMsg(TEXT("Apply Damage Using Server Request"));
 						BlasterOwner->GetLagCompensationComponent()->ServerRequestScore(
@@ -67,7 +68,6 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 							this);
 					}
 				}
-				
 			}
 			if (ImpactParticles)
 			{

@@ -3,6 +3,9 @@
 
 #include "ProjectileBullet.h"
 
+#include "Animation/AnimInstanceProxy.h"
+#include "Blaster/BlasterComponent/LagCompensationComponent.h"
+#include "Blaster/Character/BlasterCharacter.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -17,15 +20,34 @@ AProjectileBullet::AProjectileBullet()
 void AProjectileBullet::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
                               FVector NormalImpluse, const FHitResult& Hit)
 {
-	ACharacter* Character = Cast<ACharacter>(GetOwner());
-	if (Character)
+	ABlasterCharacter* OwnerCharacter = Cast<ABlasterCharacter>(GetOwner());
+	if (OwnerCharacter)
 	{
-		AController* Controller = Cast<AController>(Character->Controller);
-		if (Controller)
+		ABlasterPlayerController* OwnerController = Cast<ABlasterPlayerController>(OwnerCharacter->Controller);
+		if (OwnerController)
 		{
 			// ApplyDamage trigger a damage event, so we need a callback to bind to the damage event
-			UGameplayStatics::ApplyDamage(OtherActor, Damage, Controller, this, UDamageType::StaticClass());
+			if (OwnerCharacter->HasAuthority() && !bUseServerSideRewind)
+			{
+				UGameplayStatics::ApplyDamage(OtherActor, Damage, OwnerController, this, UDamageType::StaticClass());
+				Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpluse, Hit);
+				return;
+			}
+			ABlasterCharacter* HitCharacter = Cast<ABlasterCharacter>(OtherActor);
+			if (bUseServerSideRewind && OwnerCharacter && OwnerCharacter->GetLagCompensationComponent() && HitCharacter)
+			{
+				OwnerCharacter->GetLagCompensationComponent()->ProjectileServerRequestScore(
+					HitCharacter,
+					TraceStart,
+					InitialVelocity,
+					OwnerController->GetServerTime() - OwnerController->GetSingleTripTime());
+			}
 		}
 	}
 	Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpluse, Hit); // call destory, so call it last
+}
+
+void AProjectileBullet::BeginPlay()
+{
+	Super::BeginPlay();	
 }

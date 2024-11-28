@@ -3,6 +3,8 @@
 
 #include "OverheadWidget.h"
 
+#include "Blaster/BlasterComponent/CombatComponent.h"
+#include "Blaster/Character/BlasterCharacter.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "Components/TextBlock.h"
 #include "Kismet/GameplayStatics.h"
@@ -72,8 +74,14 @@ void UOverheadWidget::ShowPlayerNetRole(APawn* InPawn)
 	{
 		RoleText = FString("No Team");
 	}
-	
-	SetDisplayText(RoleText);
+
+	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(InPawn);
+	FString EquipWeaponName = FString::Printf(TEXT("Default"));
+	if (BlasterCharacter && BlasterCharacter->GetCombat() && BlasterCharacter->GetCombat()->GetEquippedWeapon() != nullptr)
+	{
+		EquipWeaponName = BlasterCharacter->GetCombat()->GetEquippedWeapon()->GetWeaponName().ToString();
+	}
+	SetDisplayText(EquipWeaponName);
 }
 
 void UOverheadWidget::NativeDestruct()

@@ -68,7 +68,7 @@ void AProjectileRocket::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 		return;
 	}
 	ExplodeDamage();
-	StartDestoryTimer();
+	StartDestroyTimer();
 	// Play Sound and Effect
 	if (ImpactParticles)
 	{

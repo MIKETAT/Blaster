@@ -45,7 +45,10 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsAiming = BlasterCharacter->isAiming();
 	bElimmed = BlasterCharacter->IsElimmed();
 	bUseFABRIK = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
-	if (BlasterCharacter->IsLocallyControlled() && BlasterCharacter->GetCombatState() != ECombatState::ECS_ThrowingGrenade)
+	bool bShouldUseFABRIK = BlasterCharacter->IsLocallyControlled()
+		&& BlasterCharacter->GetCombatState() != ECombatState::ECS_ThrowingGrenade
+		&& BlasterCharacter->bFinishSwapping;
+	if (bShouldUseFABRIK)
 	{
 		bUseFABRIK = !BlasterCharacter->IsLocallyReloading();
 	}
@@ -68,7 +71,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	CharacterRotation = BlasterCharacter->GetActorRotation();
 	// 和上一帧的rotation
 	const FRotator Delta = UKismetMathLibrary::NormalizedDeltaRotator(CharacterRotation, CharacterRotationLastFrame);
-	// for frame rate independency
+	// for frame rate independence
 	const float Target = Delta.Yaw / DeltaSeconds;
 	const float Interp = FMath::FInterpTo(Lean, Target, DeltaSeconds, 6.f);	// Current Target DeltaTime Speed
 	Lean = FMath::Clamp(Interp, -90.f, 90.f);	// [min, max]

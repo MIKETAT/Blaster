@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "BlasterPlayerController.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FHighPingDelegate, bool, bPingTooHigh);
+
 class ABlasterCharacter;
 /**
  * 
@@ -64,6 +66,8 @@ public:
 	void HighPingWarning(bool bShouldWarning);
 	void CheckPing(float DeltaSeconds);
 	FORCEINLINE float GetSingleTripTime() const { return SingleTripTime; }
+
+	FHighPingDelegate HighPingDelegate;
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -72,6 +76,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_bShowTeamScore)
 	bool bShowTeamScore = false;
 
+	UFUNCTION(Server, Reliable)
+	void ServerReportPingStatus(bool bHighPing);
+	
 	UFUNCTION()
 	void OnRep_bShowTeamScore();
 private:

@@ -4,10 +4,7 @@
 #include "Projectile.h"
 
 #include "NiagaraFunctionLibrary.h"
-#include "ProjectileRocket.h"
 #include "Blaster/Blaster.h"
-#include "Blaster/Character/BlasterCharacter.h"
-#include "Blaster/Utils/DebugUtil.h"
 #include "Components/BoxComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -48,9 +45,28 @@ void AProjectile::BeginPlay()
 	{
 		CollisionBox->OnComponentHit.AddDynamic(this, &AProjectile::OnHit);	// todo 研究一下
 	}
+
+	/*
+	FPredictProjectilePathParams PathParams;
+	PathParams.bTraceWithChannel = true;
+	PathParams.bTraceWithCollision = true;
+	PathParams.DrawDebugTime = 5.f;
+	PathParams.DrawDebugType = EDrawDebugTrace::ForDuration;
+	PathParams.LaunchVelocity = GetActorForwardVector() * InitialSpeed;
+	PathParams.MaxSimTime = 6.f;
+	PathParams.SimFrequency = 30.f;
+	PathParams.ProjectileRadius = 30.f;
+	PathParams.StartLocation = GetActorLocation();
+	PathParams.TraceChannel = ECC_Visibility;
+	PathParams.ActorsToIgnore.Add(this);
+
+	FPredictProjectilePathResult PathResult;
+
+	UGameplayStatics::PredictProjectilePath(this, PathParams, PathResult);
+	*/
 }
 
-void AProjectile::StartDestoryTimer()
+void AProjectile::StartDestroyTimer()
 {
 	GetWorldTimerManager().SetTimer(
 		DestroyTimer,
@@ -108,7 +124,7 @@ void AProjectile::ExplodeDamage()
 void AProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
                         FVector NormalImpluse, const FHitResult& Hit)
 {
-	Destroyed();	// destory a replicated actor will propagate ot all clients 
+	Destroyed();	// destroy a replicated actor will propagate ot all clients 
 }
 
 void AProjectile::Tick(float DeltaTime)
@@ -131,4 +147,17 @@ void AProjectile::Destroyed()
 	}
 	//ProjectileMesh->DestroyComponent();
 }
+
+#if WITH_EDITOR
+void AProjectile::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+	FName PropertyName = PropertyChangedEvent.Property != nullptr ? PropertyChangedEvent.GetPropertyName() : NAME_None;
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(AProjectile, InitialSpeed) && ProjectileMovementComponent)
+	{
+		ProjectileMovementComponent->InitialSpeed = InitialSpeed;
+		ProjectileMovementComponent->MaxSpeed = InitialSpeed;
+	}
+}
+#endif
 

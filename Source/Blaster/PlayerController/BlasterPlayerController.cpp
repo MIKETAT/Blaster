@@ -110,6 +110,7 @@ void ABlasterPlayerController::HighPingWarning(bool bShouldWarning)
 
 void ABlasterPlayerController::CheckPing(float DeltaSeconds)
 {
+	if (HasAuthority())		return;		// server 无延迟
 	HighPingCheckingTime += DeltaSeconds;
 	if (HighPingCheckingTime > HighPingCheckFrequency)
 	{
@@ -118,10 +119,15 @@ void ABlasterPlayerController::CheckPing(float DeltaSeconds)
 		ABlasterPlayerState* BlasterPlayerState = Cast<ABlasterPlayerState>(GetPlayerState<ABlasterPlayerState>());
 		if (BlasterPlayerState)
 		{
+			DebugUtil::PrintMsg(FString::Printf(TEXT("Ping: %f"), BlasterPlayerState->GetPingInMilliseconds()), FColor::Blue);
 			if (BlasterPlayerState->GetPingInMilliseconds() > HighPingThreshold)
 			{
 				HighPingWarning(true);
 				HighPingAnimExistingTime = 0.f;
+				ServerReportPingStatus(true);
+			} else
+			{
+				ServerReportPingStatus(false);
 			}
 		}
 		HighPingCheckingTime = 0.f;
@@ -172,6 +178,11 @@ void ABlasterPlayerController::ShowReturnToMainMenu()
 			MainMenuWidget->MenuTearDown();
 		}
 	}
+}
+
+void ABlasterPlayerController::ServerReportPingStatus_Implementation(bool bHighPing)
+{
+	HighPingDelegate.Broadcast(bHighPing);
 }
 
 void ABlasterPlayerController::OnRep_bShowTeamScore()

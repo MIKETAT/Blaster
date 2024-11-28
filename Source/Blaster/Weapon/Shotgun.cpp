@@ -4,6 +4,7 @@
 #include "Shotgun.h"
 
 #include "WeaponTypes.h"
+#include "Blaster/BlasterComponent/LagCompensationComponent.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "Kismet/GameplayStatics.h"
@@ -114,30 +115,55 @@ void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 			{
 				UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSound, ShotgunHitResult.ImpactPoint, ShotgunHitResult.Normal.Rotation());
 			}
-			
 			DrawDebugSphere(GetWorld(), ShotgunHitResult.Location, 10.f, 10, FColor::Blue);
 		}
 
+		TArray<ABlasterCharacter*> HitCharacters;
+		
 		// calculate damage
 		for (auto Pair : HitMap)
-		{
+		{	
+			if (Pair.Key == nullptr)	continue;
 			if (DamageMap.Contains(Pair.Key))	DamageMap[Pair.Key] += Damage * Pair.Value;
 			else DamageMap.Add(Pair.Key, Damage * Pair.Value);
+			HitCharacters.AddUnique(Pair.Key);
 		}
 		for (auto Pair : HeadShotHitMap)
 		{
+			if (Pair.Key == nullptr)	continue;
 			if (DamageMap.Contains(Pair.Key))	DamageMap[Pair.Key] += HeadShotDamage * Pair.Value;
 			else DamageMap.Add(Pair.Key, HeadShotDamage * Pair.Value);
+			HitCharacters.AddUnique(Pair.Key);
 		}
 
 		// apply damage
 		for (auto Pair : DamageMap)
 		{
-			if (InstigatorController && HasAuthority() && Pair.Key)
+			if (InstigatorController && Pair.Key)
 			{
-				UGameplayStatics::ApplyDamage(Pair.Key, Pair.Value, InstigatorController, this, UDamageType::StaticClass());
+				bool bCauseAuthDamage = !bUseServerSideRewind || BlasterOwner->IsLocallyControlled();
+				if (HasAuthority() && bCauseAuthDamage)	// server 控制的 pawn, 直接造成伤害
+				{
+					UGameplayStatics::ApplyDamage(Pair.Key, Pair.Value, InstigatorController, this, UDamageType::StaticClass());	
+				}
 			}
 		}
+
+		// 如果在client 上控制的pawn且使用SSR, 发起request
+		if (!HasAuthority() && bUseServerSideRewind)
+		{
+			BlasterOwner = BlasterOwner == nullptr ? Cast<ABlasterCharacter>(InstigatorOwner) : BlasterOwner;
+			BlasterController = BlasterController == nullptr ? Cast<ABlasterPlayerController>(InstigatorController) : BlasterController;
+			if (BlasterOwner && BlasterController && BlasterOwner->GetLagCompensationComponent() && BlasterOwner->IsLocallyControlled())
+			{
+				BlasterOwner->GetLagCompensationComponent()->ShotgunServerRequestScore(HitCharacters,
+					Start,
+					HitTargets,
+					BlasterController->GetServerTime() - BlasterController->GetSingleTripTime(),
+					this);
+			}
+		}
+		
 	}
 }
 

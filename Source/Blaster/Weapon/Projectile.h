@@ -15,9 +15,26 @@ public:
 	AProjectile();
 	virtual void Tick(float DeltaTime) override;
 	virtual void Destroyed() override;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+	
+	UPROPERTY()
+	float Damage = 20.f;		//
+	
+	/**
+	 *	Server side Rewind
+	 * 
+	 */
+	bool bUseServerSideRewind = false;
+	FVector TraceStart;
+	FVector_NetQuantize100 InitialVelocity;
+	
+	UPROPERTY(EditAnywhere)
+	float InitialSpeed = 15000.f;
 protected:
 	virtual void BeginPlay() override;
-	void StartDestoryTimer();
+	void StartDestroyTimer();
 	void DestroyTimerFinish();
 	void SpawnTrailSystem();
 	void ExplodeDamage();
@@ -25,8 +42,6 @@ protected:
 	UFUNCTION()
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpluse, const FHitResult& Hit);
 	
-	UPROPERTY(EditAnywhere)
-	float Damage = 20.f;
 	
 	UPROPERTY(EditAnywhere)
 	class UBoxComponent* CollisionBox;
@@ -54,6 +69,7 @@ protected:
 
 	UPROPERTY()
 	class UNiagaraComponent* TrailSystemComponent;
+
 private:
 	FTimerHandle DestroyTimer;
 

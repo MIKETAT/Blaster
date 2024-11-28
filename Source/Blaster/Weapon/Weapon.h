@@ -34,7 +34,6 @@ UCLASS()
 class BLASTER_API AWeapon : public AActor
 {
 	GENERATED_BODY()
-	
 public:	
 	AWeapon();
 	virtual void Tick(float DeltaTime) override;
@@ -45,7 +44,7 @@ public:
 	FORCEINLINE float GetZoomedFOV() const { return ZoomedFOV; }
 	FORCEINLINE float GetZoomInterpSpeed() const { return ZoomInterSpeed; }
 	FORCEINLINE bool CanAutomaticFire() const { return bAutomaticFire; }
-	FORCEINLINE bool CanFire() const{ return bCanFire && Ammo > 0; }	// 这里我把CanFire变量设置为Weapon的成员，感觉更合理
+	FORCEINLINE bool CanFire() const{ return bCanFire && Ammo > 0; }	// 这里我CanFire变量设置为Weapon的成员，感觉更合理
 	FORCEINLINE float GetFireDelay() const { return FireDelay; }
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE bool IsEmpty() const { return Ammo == 0; }
@@ -66,6 +65,9 @@ public:
 	void OnEquip();
 	void OnDrop();
 	void OnEquipSecondary();
+
+	UFUNCTION()
+	void OnPingTooHigh(bool bPingTooHigh);
 	
 	//UFUNCTION()
 	//void OnRep_Ammo();
@@ -75,6 +77,9 @@ public:
 	void AddAmmo(int AmmoAmount);
 	FVector TraceEndWithScatter(const FVector& HitTarget);
 
+	void BindOrRemoveHighPingDelegate(bool bBind);
+
+	virtual const FName& GetWeaponName() const;
 	/**
 	 * Enable or Disable custom depth
 	 */
@@ -97,9 +102,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
 	bool bUseScatter = false;
+	
 protected:
 	virtual void BeginPlay() override;
-	virtual const FName& GetWeaponName() const;
 	UFUNCTION( )
 	virtual void OnSphereOverlap(
 		UPrimitiveComponent* OverlapComponent,
@@ -117,7 +122,7 @@ protected:
 		UPrimitiveComponent* OtherComponent,
 		int32 OtherIndex
 	);
-
+	
 	UPROPERTY(EditAnywhere)
 	FName WeaponName;		// Edit In BP
 	
@@ -127,7 +132,7 @@ protected:
 	UPROPERTY(EditAnywhere)
 	float HeadShotDamage = 20.f;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(Replicated, EditAnywhere)
 	bool bUseServerSideRewind = false;
 
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")

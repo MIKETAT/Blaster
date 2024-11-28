@@ -30,7 +30,7 @@ void AProjectileGrenade::Destroyed()
 void AProjectileGrenade::BeginPlay()
 {
 	AActor::BeginPlay();
-	StartDestoryTimer();
+	StartDestroyTimer();
 	SpawnTrailSystem();
 	
 	ProjectileMovementComponent->OnProjectileBounce.AddDynamic(this, &AProjectileGrenade::OnBounce);

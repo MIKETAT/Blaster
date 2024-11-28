@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameFramework/Character.h"
 
 /**
  * 
@@ -30,6 +31,28 @@ public:
 		UE_LOG(LogTemp, Error, TEXT("%s"), *Msg.ToString());
 	}
 
+	static void PrintMsg(ACharacter* Character, FString Msg)
+	{
+		PrintMsg(Character, *Msg);
+	}
+	
+	static void PrintMsg(ACharacter* Character, const wchar_t* Msg)
+	{
+		if (Character == nullptr)
+		{
+			PrintMsg(Msg);
+		} else
+		{
+			if (Character->HasAuthority())
+			{
+				PrintMsg(FString::Printf(TEXT("Server: %s"), Msg));
+			} else
+			{
+				PrintMsg(FString::Printf(TEXT("Client: %s"), Msg));
+			}
+		}
+	}
+	
 	static void PrintMsg(const wchar_t* Msg)
 	{
 		PrintMsg(FString::Printf(TEXT("%s"), Msg));
@@ -40,6 +63,7 @@ public:
 		GEngine->AddOnScreenDebugMessage(-1, 3.f, Color, Msg, true, FVector2d(1.5f, 1.5f));
 		LogMsg(Msg);
 	}
+	
 	
 	static void PrintMsg(const FText& Msg, const FColor& Color = FColor::Red)
 	{

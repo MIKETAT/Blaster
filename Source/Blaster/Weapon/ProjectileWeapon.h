@@ -19,4 +19,7 @@ public:
 private:
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<class AProjectile> ProjectileClass;
+	
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<AProjectile> SSRProjectileClass;	// SSR for server side rewind, not replicated
 };

@@ -34,7 +34,7 @@ public:
 	void DropCurrentWeaponAndEquipAnotherOne(AWeapon* WeaponToEquip);
 	// CanSwapWeapon means we have two weapons
 	FORCEINLINE bool CanSwapWeapon() const { return	Character && EquippedWeapon && SecondaryWeapon && EquippedWeapon->bCanFire; }; // 返回此时是否可以切换武器 即 EquippedWeapon SecondaryWeapon均不为空且OverlappingWeapon为空
-		
+	FORCEINLINE AWeapon* GetEquippedWeapon() const { return EquippedWeapon; }
 	void SwapWeapons();
 	void TakeSecondaryWeapon();
 	void PutSecondaryWeapon();
@@ -46,6 +46,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
 
+	UFUNCTION(BlueprintCallable)
+	void FinishSwap();
+
+	UFUNCTION(BlueprintCallable)
+	void FinishSwapAttachWeapons();
+	
 	UFUNCTION(BlueprintCallable)
 	void ShotgunShellReload();
 
@@ -75,7 +81,9 @@ protected:
 	void Fire();
 	void LocalFire(const FVector_NetQuantize& TraceHitTarget);
 	void ShotgunLocalFire(const TArray<FVector_NetQuantize>& HitTargets);
-	void ShotgunServerFire(const TArray<FVector_NetQuantize>& HitTargets);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ShotgunServerFire(const TArray<FVector_NetQuantize>& HitTargets, const float FireDelay);
 	
 	
 	void StartFireTimer();
@@ -91,8 +99,8 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerSetAiming(bool isAiming);
 
-	UFUNCTION(Server, Reliable)
-	void ServerFire(const FVector_NetQuantize& TraceHitTarget);
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerFire(const FVector_NetQuantize& TraceHitTarget, const float FireDelay);
 
 	UFUNCTION(Server, Reliable)
 	void ServerReload();
@@ -157,7 +165,7 @@ private:
 	UPROPERTY(EditAnywhere)
 	int32 InitialAmmoAmount = 30;
 
-	UPROPERTY(ReplicatedUsing=OnRep_CombatState)
+	UPROPERTY(ReplicatedUsing = OnRep_CombatState)
 	ECombatState CombatState = ECombatState::ECS_UnOccupied;
 
 	UFUNCTION()

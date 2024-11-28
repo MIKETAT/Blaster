@@ -41,10 +41,13 @@ public:
 	FORCEINLINE float GetAO_Pitch() const { return AO_Pitch; }
 	AWeapon* GetEquippedWeapon() const;
 	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; }
+
+	// Play Montages
 	void PlayFireMontage(bool bAiming);
 	void PlayReloadMontage();
 	void PlayElimMontage();
 	void PlayThrowGrenadeMontage();
+	void PlaySwapMontage();
 	FVector GetHitTarget() const;
 	FORCEINLINE AWeapon* GetOverlappingWeapon() const { return OverlappingWeapon; }
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
@@ -110,6 +113,8 @@ public:
 	
 	UPROPERTY()
 	TMap<FName, class UBoxComponent*> HitCollisionBoxes;
+
+	bool bFinishSwapping = true;
 protected:
 	virtual void BeginPlay() override;
 	void MoveForward(float Value);
@@ -245,6 +250,10 @@ private:
 	
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* ThrowGrenadeMontage;
+
+	UPROPERTY(EditAnywhere, Category= Combat)
+	UAnimMontage* SwapMontage;
+
 	
 	bool bRotateRootBone;
 	// 超过这个阈值，在SimProxy执行turn animation
@@ -345,7 +354,7 @@ private:
 	class UNiagaraComponent* CrownComponent;
 	
 	UPROPERTY()
-	class ABlasterPlayerState* BlasterPlayerState;
+	ABlasterPlayerState* BlasterPlayerState;
 	
 	/**
 	 * Grenade
