@@ -28,14 +28,49 @@ void ABlasterGameMode::BeginPlay()
 	//LevelStartTime = GetWorld()->GetTimeSeconds();
 }
 
+void ABlasterGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (MatchState == MatchState::WaitingToStart)
+	{
+		CountDownTime = WarmupTime + LevelStartTime - GetWorld()->GetTimeSeconds();
+		if (CountDownTime < 0.f)
+		{
+			StartMatch();
+		}
+	} else if (MatchState == MatchState::InProgress)
+	{
+		CountDownTime = MatchTime + WarmupTime + LevelStartTime - GetWorld()->GetTimeSeconds();
+		if (CountDownTime < 0.f)
+		{
+			SetMatchState(MatchState::CoolDown);
+		}
+	} else if (MatchState == MatchState::CoolDown)
+	{
+		if (!bHasWinner)
+		{
+			CountDownTime = CoolDownTime + MatchTime + WarmupTime + LevelStartTime - GetWorld()->GetTimeSeconds();
+		} else
+		{
+			CountDownTime = CoolDownTime + MatchDuration - GetWorld()->GetTimeSeconds();
+		}
+		if (CountDownTime < 0.f)
+		{
+			RestartGame();
+			// todo restartGame后的处理，是否需要禁用一些输入。考虑不禁用输入但禁用伤害
+		}
+	}
+}
+
 void ABlasterGameMode::OnMatchStateSet()
 {
 	Super::OnMatchStateSet();
 	if (MatchState == MatchState::CoolDown)
 	{
-		
+		HandleMatchCoolDown();
 	} else if (MatchState == MatchState::WaitingToStart)
 	{
+		bHasWinner = false;
 		if (LobbyMusic)
 		{
 			LobbyMusicComp = UGameplayStatics::SpawnSound2D(this, LobbyMusic);	
@@ -57,39 +92,13 @@ void ABlasterGameMode::OnMatchStateSet()
 	}
 }
 
+// Display Winner, then jump to RestartGame
 void ABlasterGameMode::HandleMatchCoolDown()
 {
-	// 保留，用于对自定义state的处理
+	// wait cooldown time ends
 }
 
 
-void ABlasterGameMode::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-	if (MatchState == MatchState::WaitingToStart)
-	{
-		CountDownTime = WarmupTime + LevelStartTime - GetWorld()->GetTimeSeconds();
-		if (CountDownTime < 0.f)
-		{
-			StartMatch();
-		}
-	} else if (MatchState == MatchState::InProgress)
-	{
-		CountDownTime = MatchTime + WarmupTime + LevelStartTime - GetWorld()->GetTimeSeconds();
-		if (CountDownTime < 0.f)
-		{
-			SetMatchState(MatchState::CoolDown);
-		}
-	} else if (MatchState == MatchState::CoolDown)
-	{
-		CountDownTime = CoolDownTime + MatchTime + WarmupTime + LevelStartTime - GetWorld()->GetTimeSeconds();
-		if (CountDownTime < 0.f)
-		{
-			RestartGame();
-			// todo restartGame后的处理，是否需要禁用一些输入。考虑不禁用输入但禁用伤害
-		}
-	}
-}
 
 float ABlasterGameMode::CalculateDamage(AController* AttackerController, AController* VictimController, float BaseDamage)
 {
@@ -118,6 +127,18 @@ bool ABlasterGameMode::ShouldEndGame()
 	return BlasterGameState && BlasterGameState->GetTopScore() >= FullScore; 
 }
 
+// override EndMatch, jump to COOLDOWN, then Restart
+void ABlasterGameMode::EndMatch()
+{
+	if (!IsMatchInProgress())
+	{
+		return;
+	}
+	bHasWinner = true;
+	MatchDuration = GetWorld()->GetTimeSeconds();
+	SetMatchState(MatchState::CoolDown);
+}
+
 void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
                                         ABlasterPlayerController* VictimController, ABlasterPlayerController* AttackerController)
 {
@@ -128,7 +149,7 @@ void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 	if (AttackerState && VictimState && BlasterGameState && AttackerState != VictimState)
 	{
 		AttackerState->AddToScore(1.f);
-		VictimState->AddToDefeats(1);
+		VictimState->AddToDefeats(1.f);
 		// todo: 如何拷贝一个已有的TArray,类似STL的拷贝构造
 		TArray<ABlasterPlayerState*> CurrentTopPlayer;
 		for (auto it : BlasterGameState->TopScorePlayer)
@@ -177,9 +198,9 @@ void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 	}
 	if (BlasterGameState && ShouldEndGame())
 	{
-		RestartGame();	// todo Announce  这个条件 FullScore应该放在GameState里吗
+		//RestartGame();	// todo Announce  这个条件 FullScore应该放在GameState里吗
+		EndMatch();
 	}
-	
 }
 
 void ABlasterGameMode::RequestRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController)

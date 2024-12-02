@@ -31,7 +31,9 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCombatComponent, EquippedWeapon);
 	DOREPLIFETIME(UCombatComponent, SecondaryWeapon);
+	DOREPLIFETIME(UCombatComponent, TheFlag);
 	DOREPLIFETIME(UCombatComponent, bIsAiming);
+	DOREPLIFETIME(UCombatComponent, bHoldingTheFlag);
 	DOREPLIFETIME(UCombatComponent, CombatState);
 	DOREPLIFETIME_CONDITION(UCombatComponent, CarriedAmmo, COND_OwnerOnly);	//只需要复制给持有者即可，无需复制给其他玩家，节省带宽
 	DOREPLIFETIME_CONDITION(UCombatComponent, Grenades, COND_OwnerOnly);	
@@ -50,10 +52,6 @@ void UCombatComponent::BeginPlay()
 			CurrentFOV = DefaultFOV;
 		}
 		InitWeaponAmmo();// todo 在client初始化可以吗，涉及到需要和server同步。因为这里本地的HUD显示弹药需要这个
-		/*if (Character->HasAuthority())
-		{
-			
-		}*/
 	}
 	SpawnDefaultWeapon();
 }
@@ -130,6 +128,14 @@ void UCombatComponent::OnRep_bIsAiming()
 	}
 }
 
+void UCombatComponent::OnRep_bHoldingTheFlag()
+{
+	if (bHoldingTheFlag && Character && Character->IsLocallyControlled())
+	{
+		Character->Crouch();
+	}
+}
+
 void UCombatComponent::OnRep_CarriedAmmo()
 {
 	Controller = Controller == nullptr ? Cast<ABlasterPlayerController>(Controller) : Controller;
@@ -156,6 +162,7 @@ void UCombatComponent::OnRep_Grenades()
 // on client
 void UCombatComponent::OnRep_CombatState()
 {
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_CombatState")));
 	switch (CombatState)
 	{
 		case ECombatState::ECS_UnOccupied:
@@ -343,13 +350,13 @@ void UCombatComponent::ReloadAmmo()
 
 void UCombatComponent::PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount)
 {
-	if (GEngine)
+	/*if (GEngine)
 	{
 		const UEnum* EnumObj = FindObject<UEnum>(ANY_PACKAGE, TEXT("EWeaponType"), true);
 		FString WeaponTypeStr = *EnumObj->GetDisplayNameTextByIndex(static_cast<uint8>(WeaponType)).ToString();
 		FString Info = FString::Printf(TEXT("Picked %s Ammo %d"), *WeaponTypeStr, AmmoAmount);
 		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, Info, true, FVector2D(4.f, 4.f));
-	}
+	}*/
 	if (CarriedAmmoMap.Contains(WeaponType))
 	{
 		CarriedAmmoMap[WeaponType] = FMath::Clamp(CarriedAmmoMap[WeaponType] + AmmoAmount, 0, MaxAmmoAmount);
@@ -406,13 +413,13 @@ int32 UCombatComponent::AmountToReload()
 {
 	if (Character == nullptr || EquippedWeapon == nullptr)	return 0;
 	int32 RoomForReload = EquippedWeapon->GetMaxCapacity() - EquippedWeapon->GetAmmo();
-	DebugUtil::PrintMsg(FString::Printf(TEXT("RoomForReload is %d"), RoomForReload), FColor::Red);
-	DebugUtil::LogMsg(FString::Printf(TEXT("RoomForReload is %d"), RoomForReload));
+	//DebugUtil::PrintMsg(FString::Printf(TEXT("RoomForReload is %d"), RoomForReload), FColor::Red);
+	//DebugUtil::LogMsg(FString::Printf(TEXT("RoomForReload is %d"), RoomForReload));
 	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
 		int32 CarriedWeaponAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
 		int32 Least = FMath::Min(CarriedWeaponAmmo, RoomForReload);
-		UE_LOG(LogTemp, Error, TEXT("CarriedWeaponAmmo = %d  Least = %d"), CarriedWeaponAmmo, Least);
+	//	UE_LOG(LogTemp, Error, TEXT("CarriedWeaponAmmo = %d  Least = %d"), CarriedWeaponAmmo, Least);
 		return FMath::Clamp(RoomForReload, 0, Least);	
 	}
 	return 0;
@@ -421,6 +428,7 @@ int32 UCombatComponent::AmountToReload()
 void UCombatComponent::Reload()
 {
 	if (EquippedWeapon == nullptr || EquippedWeapon->IsFull())	return;
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Call Reload")));
 	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_UnOccupied && !bLocallyReloading)
 	{
 		ServerReload();
@@ -442,6 +450,7 @@ void UCombatComponent::ServerReload_Implementation()
 // todo reload的动画需要改，只上半身reload，不影响下半身，不会改变状态(蹲下->站起)这种
 void UCombatComponent::HandleReload()
 {
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Call HandleReload")));
 	CombatState = ECombatState::ECS_Reloading;
 	if (Character)
 	{
@@ -451,6 +460,8 @@ void UCombatComponent::HandleReload()
 
 void UCombatComponent::FinishReloading()
 {
+	FString Name = Character ? Character->GetName() : "No Name";
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Call FinishReloading, %s Reload"), *Name));
 	if (Character == nullptr)	return;
 	bLocallyReloading = false;
 	// 重要变量的变化，例如状态的变化都在server执行
@@ -483,10 +494,19 @@ void UCombatComponent::FinishSwap()
 	}
 }
 
+void UCombatComponent::TestNotify()
+{
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("TestNotify")));
+}
+
 void UCombatComponent::FinishSwapAttachWeapons()
 {
-	if (Character == nullptr || !Character->HasAuthority())	return;		// 避免client重复swap
-	DebugUtil::PrintMsg(Character, TEXT("Call FinishSwapAttachWeapons"));
+	// local effects
+	PlayEquipWeaponSound(EquippedWeapon);
+	
+	FString Name = Character ? Character->GetName() : FString("No Name");
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("%s Call FinishSwapAttachWeapons"), *Name));
+	if (Character == nullptr || !EquippedWeapon|| !Character->HasAuthority())	return;		// 避免client重复swap
 	AWeapon* TempWeapon = EquippedWeapon;
 	// Update CarriedAmmo
 	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
@@ -503,19 +523,12 @@ void UCombatComponent::FinishSwapAttachWeapons()
 	SecondaryWeapon = TempWeapon;
 	AttachActorToBackpack(SecondaryWeapon);
 	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
-	PlayEquipWeaponSound(EquippedWeapon);
+
 	AutoReloadEmptyWeapon();
 	UpdateAmmoHUD();
-	if (Character && Character->HasAuthority())
-	{
-		UE_LOG(LogTemp, Error, TEXT("Server"));
-	} else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Client"));
-	}
-	DebugUtil::PrintMsg(FString("FinishSwapAttachWeapons"), FColor::Red);
-	DebugUtil::PrintMsg(FString("Now First Weapon is " + EquippedWeapon->GetName()), FColor::Red);
-	DebugUtil::PrintMsg(FString("Now Second Weapon is " + SecondaryWeapon->GetName()), FColor::Red);
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("FinishSwapAttachWeapons")));
+	DebugUtil::PrintMsg(Character, FString("Now First Weapon is " + EquippedWeapon->GetName()));
+	DebugUtil::PrintMsg(Character, FString("Now Second Weapon is " + SecondaryWeapon->GetName()));
 }
 
 void UCombatComponent::ThrowGrenade()
@@ -524,6 +537,9 @@ void UCombatComponent::ThrowGrenade()
 	
 	// todo 没有武器时是否可以扔雷
 	if (CombatState != ECombatState::ECS_UnOccupied || !Character)	return;
+
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("ThrowGrenade")));
+	
 	CombatState = ECombatState::ECS_ThrowingGrenade;
 	Character->PlayThrowGrenadeMontage();
 	AttachActorToLeftHand(EquippedWeapon);
@@ -550,6 +566,9 @@ void UCombatComponent::ShowGrenade(bool bShowGrenade)
 void UCombatComponent::ServerThrowGrenade_Implementation()
 {
 	if (Grenades == 0)	return;
+
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("ThrowGrenadeServerThrowGrenade_Implementation")));
+	
 	CombatState = ECombatState::ECS_ThrowingGrenade;
 	if (Character)
 	{
@@ -743,20 +762,26 @@ void UCombatComponent::OnRep_SecondaryWeapon()
 	}
 }
 
+void UCombatComponent::OnRep_TheFlag()
+{
+	if (TheFlag)
+	{
+		TheFlag->SetWeaponState(EWeaponState::EWS_Equipped);
+		AttachFlagToLeftHand(TheFlag);
+	}
+}
+
 // 初始化CarriedAmmoMap
 void UCombatComponent::InitWeaponAmmo()
 {
 	const UEnum* EnumObj = FindObject<UEnum>(ANY_PACKAGE, TEXT("EWeaponType"), true);
 	
-	// 先随便写下方便测试
 	UEnum* MyEnum = StaticEnum<EWeaponType>();
 	for (int i = 0; i < MyEnum->NumEnums()-1; i++)
 	{
 		EWeaponType type = EWeaponType(MyEnum->GetValueByIndex(i));
 		CarriedAmmoMap.Emplace(type, 0);
-		//UE_LOG(LogTemp, Error, TEXT("WeaponType = %s"), *EnumObj->GetDisplayNameTextByIndex(static_cast<uint8>(type)).ToString());
 	}
-	//CarriedAmmoMap.Emplace(EWeaponType::EWT_Shotgun, 2);
 }
 
 void UCombatComponent::SpawnDefaultWeapon()
@@ -766,7 +791,10 @@ void UCombatComponent::SpawnDefaultWeapon()
 	if (!BlasterGameMode || !World || !Character || !Character->GetCombat())	return;
 	AWeapon* DefaultWeapon = World->SpawnActor<AWeapon>(DefaultWeaponClass);
 	EquipWeapon(DefaultWeapon);
-	DefaultWeapon->SetIsDefaultWeapon(true);
+	if (DefaultWeapon)
+	{
+		DefaultWeapon->SetIsDefaultWeapon(true);
+	}
 	DebugUtil::PrintMsg(Character, TEXT("SpawnDefaultWeapon"));
 }
 
@@ -815,6 +843,17 @@ void UCombatComponent::AttachActorToLeftHand(AActor* ActorToAttach)
 	}
 }
 
+void UCombatComponent::AttachFlagToLeftHand(AWeapon* Flag)
+{
+	DebugUtil::PrintMsg(Character, TEXT("AttachFlagToLeftHand"));
+	if (Character == nullptr || Character->GetMesh() == nullptr || Flag == nullptr)	return;
+	const USkeletalMeshSocket* FlagSocket = Character->GetMesh()->GetSocketByName(FName("FlagSocket"));
+	if (FlagSocket)
+	{
+		FlagSocket->AttachActor(Flag, Character->GetMesh());
+	}
+}
+
 void UCombatComponent::AttachActorToBackpack(AActor* ActorToAttach)
 {
 	if (Character == nullptr || Character->GetMesh() == nullptr || ActorToAttach == nullptr)	return;
@@ -854,6 +893,18 @@ void UCombatComponent::AutoReloadEmptyWeapon()
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquipped)
 {
 	if (!Character || !WeaponToEquipped || CombatState != ECombatState::ECS_UnOccupied)	return;
+	// capture the flag
+	if (WeaponToEquipped->GetWeaponType() == EWeaponType::EWT_Flag)
+	{
+		if (Character)		Character->Crouch();
+		bHoldingTheFlag = true;
+		WeaponToEquipped->SetWeaponState(EWeaponState::EWS_Equipped);
+		WeaponToEquipped->SetOwner(Character);
+		AttachFlagToLeftHand(WeaponToEquipped);
+		TheFlag = WeaponToEquipped;
+		return;
+	}
+	// equip weapon
 	if (EquippedWeapon == nullptr)
 	{
 		EquipPrimitiveWeapon(WeaponToEquipped);
@@ -937,7 +988,6 @@ void UCombatComponent::SwapWeapons()
 	CombatState = ECombatState::ECS_SwapWeapons;
 	Character->bFinishSwapping = false;
 	DebugUtil::PrintMsg(Character, TEXT("Call SwapWeapons"));
-	//
 }
 
 // 无枪时掏出第二把枪
@@ -997,6 +1047,7 @@ void UCombatComponent::JumpToShotgunEnd()
 
 void UCombatComponent::ThrowGrenadeFinished()
 {
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("ThrowGrenadeFinished")));
 	CombatState = ECombatState::ECS_UnOccupied;
 	AttachActorToRightHand(EquippedWeapon);
 }
@@ -1004,15 +1055,18 @@ void UCombatComponent::ThrowGrenadeFinished()
 void UCombatComponent::LaunchGrenade()
 {
 	ShowGrenade(false);
+	FString Name = Character ? Character->GetName() : "No Name";
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("LaunchGrenade Name is %s"), *Name));
+	
 	if (Character && Character->IsLocallyControlled())
 	{
 		ServerLaunchGrenade(HitTarget);
 	}
+	
 }
 
 void UCombatComponent::FireHitScanWeapon()
 {
-	DebugUtil::PrintMsg(FString(TEXT("EFT_HitScan")), FColor::Blue);
 	if (EquippedWeapon && Character)
 	{
 		HitTarget = EquippedWeapon->bUseScatter ? EquippedWeapon->TraceEndWithScatter(HitTarget) : HitTarget;
@@ -1027,7 +1081,6 @@ void UCombatComponent::FireHitScanWeapon()
 // for assault rifle
 void UCombatComponent::FireProjectileWeapon()
 {
-	DebugUtil::PrintMsg(FString(TEXT("EFT_Projectile")), FColor::Blue);
 	if (Character && EquippedWeapon)
 	{
 		HitTarget = EquippedWeapon->bUseScatter ? EquippedWeapon->TraceEndWithScatter(HitTarget) : HitTarget;
@@ -1042,7 +1095,6 @@ void UCombatComponent::FireProjectileWeapon()
 // Calc hit results locally
 void UCombatComponent::FireShotgun()
 {
-	//DebugUtil::PrintMsg(FString(TEXT("EFT_Shotgun")), FColor::Blue);
 	AShotgun* Shotgun = Cast<AShotgun>(EquippedWeapon);
 	if (!Shotgun)	return;
 	TArray<FVector_NetQuantize> HitTargets;

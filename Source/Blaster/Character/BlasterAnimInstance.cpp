@@ -44,6 +44,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsCrouched = BlasterCharacter->bIsCrouched;
 	bIsAiming = BlasterCharacter->isAiming();
 	bElimmed = BlasterCharacter->IsElimmed();
+	bHoldingTheFlag = BlasterCharacter->IsHoldingTheFlag();
 	bUseFABRIK = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
 	bool bShouldUseFABRIK = BlasterCharacter->IsLocallyControlled()
 		&& BlasterCharacter->GetCombatState() != ECombatState::ECS_ThrowingGrenade

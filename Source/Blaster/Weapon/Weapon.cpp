@@ -130,16 +130,6 @@ void AWeapon::Fire(const FVector& HitTarget)
 	SpendRound();
 }
 
-void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlapComponent, AActor* OtherActor,
-	UPrimitiveComponent* OtherComponent, int32 OtherIndex, bool mFromSweep, const FHitResult& SweepHitResult)
-{
-	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(OtherActor);
-	if (BlasterCharacter)
-	{
-		BlasterCharacter->SetOverlappingWeapon(this);
-	}
-}
-
 // set PickupWidget visibility to false
 void AWeapon::ShowPickupWidget(bool bShowWidget)
 {
@@ -150,12 +140,26 @@ void AWeapon::ShowPickupWidget(bool bShowWidget)
 	}
 }
 
+void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlapComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComponent, int32 OtherIndex, bool mFromSweep, const FHitResult& SweepHitResult)
+{
+	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(OtherActor);
+	if (BlasterCharacter)
+	{
+		if (WeaponType == EWeaponType::EWT_Flag && BlasterCharacter->GetTeam() != Team)	return;
+		if (BlasterCharacter->IsHoldingTheFlag())		return;
+		BlasterCharacter->SetOverlappingWeapon(this);
+	}
+}
+
 void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlapComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComponent, int32 OtherIndex)
 {
 	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(OtherActor);
 	if (BlasterCharacter)
 	{
+		if (WeaponType == EWeaponType::EWT_Flag && BlasterCharacter->GetTeam() != Team)	return;
+		if (BlasterCharacter->IsHoldingTheFlag())		return;
 		BlasterCharacter->SetOverlappingWeapon(nullptr);
 	}
 }

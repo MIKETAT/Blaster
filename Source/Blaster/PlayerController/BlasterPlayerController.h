@@ -132,6 +132,9 @@ private:
 
 	UPROPERTY()
 	float SingleTripTime;
+
+	UPROPERTY()
+	float MatchDuration;
 	
 	UFUNCTION()
 	void OnRep_MatchState();

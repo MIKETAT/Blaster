@@ -119,7 +119,7 @@ void ABlasterPlayerController::CheckPing(float DeltaSeconds)
 		ABlasterPlayerState* BlasterPlayerState = Cast<ABlasterPlayerState>(GetPlayerState<ABlasterPlayerState>());
 		if (BlasterPlayerState)
 		{
-			DebugUtil::PrintMsg(FString::Printf(TEXT("Ping: %f"), BlasterPlayerState->GetPingInMilliseconds()), FColor::Blue);
+			//DebugUtil::PrintMsg(FString::Printf(TEXT("Ping: %f"), BlasterPlayerState->GetPingInMilliseconds()), FColor::Blue);
 			if (BlasterPlayerState->GetPingInMilliseconds() > HighPingThreshold)
 			{
 				HighPingWarning(true);
@@ -358,7 +358,10 @@ void ABlasterPlayerController::SetHUDTime()
 	float TimeLeft = 0.f;
 	if (MatchState == MatchState::WaitingToStart)	TimeLeft = WarmupTime - GetServerTime() + LevelStartTime;
 	else if (MatchState == MatchState::InProgress)	TimeLeft = MatchTime - GetServerTime() + LevelStartTime + WarmupTime;
-	else if (MatchState == MatchState::CoolDown)	TimeLeft = MatchTime - GetServerTime() + LevelStartTime + WarmupTime + CoolDownTime;
+	else if (MatchState == MatchState::CoolDown)
+	{
+		TimeLeft = MatchDuration + CoolDownTime - GetServerTime();
+	}
 	
 	int32 SecondLeft = FMath::CeilToInt(TimeLeft);
 
@@ -486,7 +489,6 @@ void ABlasterPlayerController::HandleMatchStart(bool bTeamMatch)
 		{
 			BlasterHUD->Announcement->SetVisibility(ESlateVisibility::Hidden);
 		}
-		if (!HasAuthority())	return;
 		if (bTeamMatch)
 		{
 			InitTeamScore();
@@ -499,6 +501,7 @@ void ABlasterPlayerController::HandleMatchStart(bool bTeamMatch)
 
 void ABlasterPlayerController::HandleMatchCoolDown()
 {
+	DebugUtil::PrintMsg(FString::Printf(TEXT("ABlasterPlayerController::HandleMatchCoolDown")));
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	if (BlasterHUD)
 	{
@@ -506,7 +509,11 @@ void ABlasterPlayerController::HandleMatchCoolDown()
 		bool bIsHUDValid = BlasterHUD->Announcement &&
 			BlasterHUD->Announcement->InfoText &&
 			BlasterHUD->Announcement->AnnouncementText;
-		if (!bIsHUDValid)	return;
+		if (!bIsHUDValid)
+		{
+			DebugUtil::PrintMsg(GetOwner(), FString::Printf(TEXT("invalid HUD")));
+			return;
+		}
 		BlasterHUD->Announcement->SetVisibility(ESlateVisibility::Visible);
 		FString Announcement = Announcement::NextMatchStartIn;
 		BlasterHUD->Announcement->AnnouncementText->SetText(FText::FromString(Announcement));
@@ -531,6 +538,7 @@ void ABlasterPlayerController::SetMatchState(FName State, bool bTeamMatch)
 	} else if (MatchState == MatchState::CoolDown)
 	{
 		HandleMatchCoolDown();
+		MatchDuration = GetServerTime();
 	}
 }
 
@@ -547,7 +555,11 @@ void ABlasterPlayerController::InitTeamScore()
 void ABlasterPlayerController::HideTeamScore()
 {
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
-	if (bool bValid = BlasterHUD && BlasterHUD->CharacterOverlay && BlasterHUD->CharacterOverlay->RedTeamScore && BlasterHUD->CharacterOverlay->BlueTeamScore)
+	bool bValid =	BlasterHUD
+					&& BlasterHUD->CharacterOverlay
+					&& BlasterHUD->CharacterOverlay->RedTeamScore
+					&& BlasterHUD->CharacterOverlay->BlueTeamScore;
+	if (bValid)
 	{
 		BlasterHUD->CharacterOverlay->RedTeamScore->SetVisibility(ESlateVisibility::Hidden);
 		BlasterHUD->CharacterOverlay->BlueTeamScore->SetVisibility(ESlateVisibility::Hidden);
@@ -590,7 +602,7 @@ FString ABlasterPlayerController::GetCurrentTopPlayerInfo() const
 FString ABlasterPlayerController::GetTeamInfo(ABlasterGameState* ABGState) const
 {
 	if (ABGState == nullptr)	return FString();
-	FString TeamInfoText;
+	FString TeamInfoText{"DefaultInfo"};
 	const int32 RedTeamScore = ABGState->GetRedTeamScore();
 	const int32 BlueTeamScore = ABGState->GetBlueTeamScore();
 
@@ -651,6 +663,7 @@ void ABlasterPlayerController::OnRep_MatchState()
 	} else if (MatchState == MatchState::CoolDown)
 	{
 		HandleMatchCoolDown();
+		MatchDuration = GetServerTime();
 	}
 }
 

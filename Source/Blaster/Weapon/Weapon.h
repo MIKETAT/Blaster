@@ -3,10 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blaster/BlasterTypes/Team.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/Actor.h"
 #include "Weapon.generated.h"
 
+class UWidgetComponent;
 enum class EWeaponType : uint8;
 class ABlasterPlayerController;
 class ABlasterCharacter;
@@ -40,7 +42,9 @@ public:
 	void ShowPickupWidget(bool bShowWidget);
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
-	virtual void Fire(const FVector& HitTarget);
+	FORCEINLINE USphereComponent* GetAreaSphere() const { return AreaSphere; }
+	FORCEINLINE UWidgetComponent* GetPickupWidget() const { return PickUpWidget; }
+	
 	FORCEINLINE float GetZoomedFOV() const { return ZoomedFOV; }
 	FORCEINLINE float GetZoomInterpSpeed() const { return ZoomInterSpeed; }
 	FORCEINLINE bool CanAutomaticFire() const { return bAutomaticFire; }
@@ -57,13 +61,14 @@ public:
 	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
 	FORCEINLINE float GetDamage() const { return Damage; }
 	FORCEINLINE float GetHeadshotDamage() const { return HeadShotDamage; }
-	void Drop();
+	FORCEINLINE ETeam GetTeam() const { return Team; }
+	virtual void Fire(const FVector& HitTarget);
+	virtual void Drop();
 	void SetWeaponPhysicsAndCollision(bool bEnable);
 	void SetWeaponState(EWeaponState state);
 	FORCEINLINE EWeaponState GetWeaponState() const { return WeaponState; }
 	void OnWeaponStateChange();
-	void OnEquip();
-	void OnDrop();
+
 	void OnEquipSecondary();
 
 	UFUNCTION()
@@ -102,10 +107,16 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
 	bool bUseScatter = false;
+
+	UPROPERTY(EditAnywhere)
+	ETeam Team;
 	
 protected:
 	virtual void BeginPlay() override;
-	UFUNCTION( )
+	virtual void OnEquip();
+	virtual void OnDrop();
+	
+	UFUNCTION()
 	virtual void OnSphereOverlap(
 		UPrimitiveComponent* OverlapComponent,
 		AActor* OtherActor,

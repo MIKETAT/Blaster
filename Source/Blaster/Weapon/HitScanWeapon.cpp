@@ -127,5 +127,5 @@ void AHitScanWeapon::WeaponHit(const FVector& Start, const FVector& HitTarget, F
 	{
 		OutHit.ImpactPoint = End;
 	}
-	DrawDebugSphere(GetWorld(), BeamEnd, 9.f, 10, FColor::Purple, true);
+	//DrawDebugSphere(GetWorld(), BeamEnd, 9.f, 10, FColor::Purple, true);
 }

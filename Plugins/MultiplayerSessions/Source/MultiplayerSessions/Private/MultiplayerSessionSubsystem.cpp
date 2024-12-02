@@ -20,6 +20,10 @@ UMultiplayerSessionSubsystem::UMultiplayerSessionSubsystem() :
 
 void UMultiplayerSessionSubsystem::CreateSession(int32 NumberPublicConnections, FString TypeOfMatch)
 {
+	// save settings first
+	DesiredNumConnections = NumberPublicConnections;
+	DesiredMatchType = TypeOfMatch;
+	
 	if (!SessionInterface.IsValid())	return;
 	if (auto ExistingSession = SessionInterface->GetNamedSession(NAME_GameSession)) {
 		bCreateSessionOnDestroy = true;

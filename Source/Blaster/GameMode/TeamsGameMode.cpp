@@ -35,6 +35,8 @@ void ATeamsGameMode::HandleMatchHasStarted()
 	Super::HandleMatchHasStarted();
 	ABlasterGameState* BGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
 	if (!BGameState)	return;
+	DebugUtil::PrintMsg(FString::Printf(TEXT("ATeamsGameMode, 111111")), FColor::Green);
+	DebugUtil::PrintMsg(FString::Printf(TEXT("Player Array Num = %d"), BGameState->PlayerArray.Num()), FColor::Green);
 	for (auto PState : BGameState->PlayerArray)
 	{
 		ABlasterPlayerState* BPState = Cast<ABlasterPlayerState>(PState);
@@ -44,13 +46,16 @@ void ATeamsGameMode::HandleMatchHasStarted()
 			{
 				BGameState->BlueTeam.AddUnique(BPState);
 				BPState->SetTeam(ETeam::ET_TeamBlue);
+				DebugUtil::PrintMsg(FString::Printf(TEXT("Team Blue Add one")), FColor::Green);
 			} else
 			{
 				BGameState->RedTeam.AddUnique(BPState);
 				BPState->SetTeam(ETeam::ET_TeamRed);
+				DebugUtil::PrintMsg(FString::Printf(TEXT("Team Red Add one")), FColor::Green);
 			}
 		}
 	}
+	DebugUtil::PrintMsg(FString::Printf(TEXT("ATeamsGameMode, 2222222")), FColor::Green);
 }
 
 void ATeamsGameMode::PostLogin(APlayerController* NewPlayer)

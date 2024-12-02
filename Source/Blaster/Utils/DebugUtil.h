@@ -35,6 +35,40 @@ public:
 	{
 		PrintMsg(Character, *Msg);
 	}
+
+	static void PrintMsg(const AActor* Actor, const wchar_t* Msg)
+	{
+		if (Actor == nullptr)
+		{
+			PrintMsg(Msg);
+		} else
+		{
+			if (Actor->HasAuthority())
+			{
+				PrintMsg(FString::Printf(TEXT("Server: %s"), Msg));
+			} else
+			{
+				PrintMsg(FString::Printf(TEXT("		Client: %s"), Msg));
+			}
+		}
+	}
+	
+	static void PrintMsg(const AActor* Actor, FString Msg)
+	{
+		if (Actor == nullptr)
+		{
+			PrintMsg(Msg);
+		} else
+		{
+			if (Actor->HasAuthority())
+			{
+				PrintMsg(FString::Printf(TEXT("Server: %s"), *Msg));
+			} else
+			{
+				PrintMsg(FString::Printf(TEXT("		Client: %s"), *Msg));
+			}
+		}
+	}
 	
 	static void PrintMsg(ACharacter* Character, const wchar_t* Msg)
 	{
@@ -48,7 +82,7 @@ public:
 				PrintMsg(FString::Printf(TEXT("Server: %s"), Msg));
 			} else
 			{
-				PrintMsg(FString::Printf(TEXT("Client: %s"), Msg));
+				PrintMsg(FString::Printf(TEXT("		Client: %s"), Msg));
 			}
 		}
 	}

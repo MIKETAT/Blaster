@@ -17,10 +17,10 @@
 #include "Blaster/Blaster.h"
 #include "Blaster/BlasterGameState.h"
 #include "Blaster/BlasterComponent/LagCompensationComponent.h"
+#include "Blaster/PlayerStart/TeamPlayerStart.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "Blaster/Utils/DebugUtil.h"
 #include "Blaster/Weapon/WeaponTypes.h"
-#include "Chaos/Deformable/ChaosDeformableCollisionsProxy.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystemComponent.h"
@@ -50,8 +50,8 @@ ABlasterCharacter::ABlasterCharacter()
 	OverheadWidget->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
 	OverheadWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
-	Combat->SetIsReplicated(true);
+	BlasterCombatComp = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+	BlasterCombatComp->SetIsReplicated(true);
 	
 	Buff = CreateDefaultSubobject<UBuffComponent>(TEXT("BuffComponent"));
 	Buff->SetIsReplicated(true);
@@ -221,9 +221,10 @@ void ABlasterCharacter::BeginPlay()
 
 	// init
 	Health = MaxHealth;
-	if (Combat == nullptr)
+	if (BlasterCombatComp == nullptr)
 	{
-		Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+		//Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("In BlasterCharacter BeginPlay Combat is null")));
 	}
 	UpdateHealthHUD();
 	UpdateShieldHUD();
@@ -237,31 +238,15 @@ void ABlasterCharacter::BeginPlay()
 	}
 }
 
-void ABlasterCharacter::Tick(float DeltaTime)
+void ABlasterCharacter::RotateInPlace(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
-
-	/*if (HasAuthority())
+	if (BlasterCombatComp && BlasterCombatComp->bHoldingTheFlag)
 	{
-		FString ModeName = UGameplayStatics::GetGameMode(this)->GetName();
-		DebugUtil::PrintMsg(ModeName, FColor::Red);
-	}*/
-	
-	/*if (GetBlasterPlayerState())
-	{
-		FString Msg("None");
-		if (GetBlasterPlayerState()->GetTeam() == ETeam::ET_TeamBlue)
-		{
-			Msg = FString("Blue");
-		} else if (GetBlasterPlayerState()->GetTeam() == ETeam::ET_TeamRed)
-		{
-			Msg = FString("Red");
-		}
-		DebugUtil::PrintMsg(Msg, FColor::Purple);
-	}*/
-	
-	// 1. 使用AimOffset  only for player controlling the character
-	// 2. 使用SImProxyTurn   for simProxy or character not controlled on server 
+		bUseControllerRotationYaw = false;
+		GetCharacterMovement()->bOrientRotationToMovement = true;
+		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		return;
+	}
 	if (GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
 	{
 		AimOffset(DeltaTime);	
@@ -274,10 +259,17 @@ void ABlasterCharacter::Tick(float DeltaTime)
 		}
 		CalculateAO_Pitch();	// but calc pitch every frame
 	}
-	if (IsLocallyControlled())
-	{
-		HideCharacterIfCameraClose();
-	}
+}
+
+void ABlasterCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	
+	// 1. 使用AimOffset  only for player controlling the character
+	// 2. 使用SImProxyTurn   for simProxy or character not controlled on server 
+	RotateInPlace(DeltaTime);
+	HideCharacterIfCameraClose();
+	
 	// initialization
 	PollInit();
 	UpdateHealthHUD();
@@ -289,14 +281,15 @@ void ABlasterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(ABlasterCharacter, OverlappingWeapon, COND_OwnerOnly);
 	DOREPLIFETIME(ABlasterCharacter, Health);
+	DOREPLIFETIME(ABlasterCharacter, Shield);
 }
 
 void ABlasterCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	if (Combat)
+	if (BlasterCombatComp)
 	{
-		Combat->Character = this;
+		BlasterCombatComp->Character = this;
 	}
 	if (Buff)
 	{
@@ -331,25 +324,33 @@ if (OverlappingWeapon)
 	}
 }
 
+void ABlasterCharacter::SetHoldingTheFlag(bool bHolding)
+{
+	if (BlasterCombatComp)
+	{
+		BlasterCombatComp->bHoldingTheFlag = bHolding;
+	}
+}
+
 bool ABlasterCharacter::isWeaponEquipped() const
 {
-	return Combat && Combat->EquippedWeapon;
+	return BlasterCombatComp && BlasterCombatComp->EquippedWeapon;
 }
 
 bool ABlasterCharacter::isAiming() const
 {
-	return Combat && Combat->bIsAiming;
+	return BlasterCombatComp && BlasterCombatComp->bIsAiming;
 }
 
 AWeapon* ABlasterCharacter::GetEquippedWeapon() const
 {
-	if (Combat == nullptr)	return nullptr;
-	return Combat->EquippedWeapon;
+	if (BlasterCombatComp == nullptr)	return nullptr;
+	return BlasterCombatComp->EquippedWeapon;
 }
 
 void ABlasterCharacter::PlayFireMontage(bool bAiming)
 {
-	if (!Combat || !Combat->EquippedWeapon)	return;
+	if (!BlasterCombatComp || !BlasterCombatComp->EquippedWeapon)	return;
 	//PlayAnimMontage(FireWeaponMontage);
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && FireWeaponMontage)
@@ -362,14 +363,14 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 
 void ABlasterCharacter::PlayReloadMontage()
 {
-	if (!Combat || !Combat->EquippedWeapon)	return;
+	if (!BlasterCombatComp || !BlasterCombatComp->EquippedWeapon)	return;
 	//PlayAnimMontage(FireWeaponMontage);
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && ReloadMontage)
 	{
 		AnimInstance->Montage_Play(ReloadMontage);
 		FName SectionName;
-		switch (Combat->EquippedWeapon->GetWeaponType())
+		switch (BlasterCombatComp->EquippedWeapon->GetWeaponType())
 		{
 			case EWeaponType::EWT_AssaultRifle:
 				SectionName = FName("Rifle");
@@ -399,6 +400,16 @@ void ABlasterCharacter::PlayReloadMontage()
 	}
 }
 
+void ABlasterCharacter::PlayHoverMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && HoverMontage)
+	{
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("%s PlayHoverMontage"), *this->GetName()));
+		AnimInstance->Montage_Play(HoverMontage);
+	}
+}
+
 void ABlasterCharacter::PlayElimMontage()
 {
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
@@ -410,6 +421,7 @@ void ABlasterCharacter::PlayElimMontage()
 
 void ABlasterCharacter::PlayThrowGrenadeMontage()
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("%s PlayThrowGrenadeMontage"), *this->GetName()));
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && ThrowGrenadeMontage)
 	{
@@ -423,25 +435,42 @@ void ABlasterCharacter::PlaySwapMontage()
 	if (AnimInstance && SwapMontage)
 	{
 		AnimInstance->Montage_Play(SwapMontage);
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("%s Play Swap Montage"), *this->GetName()));
 	}
 }
 
 FVector ABlasterCharacter::GetHitTarget() const
 {
-	if (Combat == nullptr)	return FVector();
-	return Combat->HitTarget;
+	if (BlasterCombatComp == nullptr)	return FVector();
+	return BlasterCombatComp->HitTarget;
+}
+
+bool ABlasterCharacter::IsHoldingTheFlag() const
+{
+	if (BlasterCombatComp == nullptr)	return false;
+	return BlasterCombatComp->bHoldingTheFlag;
 }
 
 bool ABlasterCharacter::IsLocallyReloading()
 {
-	if (!Combat)	return false;
-	return Combat->bLocallyReloading;
+	if (!BlasterCombatComp)	return false;
+	return BlasterCombatComp->bLocallyReloading;
 }
 
 ECombatState ABlasterCharacter::GetCombatState() const
 {
-	if (Combat == nullptr)	return ECombatState::ECS_UnOccupied;
-	return Combat->CombatState;
+	if (BlasterCombatComp == nullptr)	return ECombatState::ECS_UnOccupied;
+	return BlasterCombatComp->CombatState;
+}
+
+ETeam ABlasterCharacter::GetTeam()
+{
+	BlasterPlayerState = GetBlasterPlayerState();
+	if (BlasterPlayerState == nullptr)
+	{
+		return ETeam::ET_None;
+	}
+	return BlasterPlayerState->GetTeam();
 }
 
 float ABlasterCharacter::CalculateSpeed()
@@ -471,12 +500,14 @@ void ABlasterCharacter::UpdateShieldHUD()
 
 void ABlasterCharacter::DropOrDestroyWeapons()
 {
-	if (Combat)
+	if (BlasterCombatComp)
 	{
-		Combat->DropOrDestroyWeapon(Combat->EquippedWeapon);
-		Combat->DropOrDestroyWeapon(Combat->SecondaryWeapon);
-		Combat->EquippedWeapon = nullptr;
-		Combat->SecondaryWeapon = nullptr;
+		BlasterCombatComp->DropOrDestroyWeapon(BlasterCombatComp->EquippedWeapon);
+		BlasterCombatComp->DropOrDestroyWeapon(BlasterCombatComp->SecondaryWeapon);
+		BlasterCombatComp->DropOrDestroyWeapon(BlasterCombatComp->TheFlag);
+		BlasterCombatComp->EquippedWeapon = nullptr;
+		BlasterCombatComp->SecondaryWeapon = nullptr;
+		BlasterCombatComp->TheFlag = nullptr;
 	}
 }
 
@@ -484,6 +515,35 @@ void ABlasterCharacter::Elim(bool bPlayerLeftGame)
 {
 	DropOrDestroyWeapons();
 	MulticastElim(bPlayerLeftGame);
+}
+
+// Set Team Player Start Point once PlayerState(Team) is initialized
+void ABlasterCharacter::SetSpawnPoint()
+{
+	TArray<AActor*> AllPlayerStart;
+	UGameplayStatics::GetAllActorsOfClass(this, ATeamPlayerStart::StaticClass(), AllPlayerStart);
+	TArray<ATeamPlayerStart*> MyTeamPlayerStarts;
+	for (auto Start : AllPlayerStart)
+	{
+		ATeamPlayerStart* TeamPlayerStart = Cast<ATeamPlayerStart>(Start);
+		if (TeamPlayerStart && TeamPlayerStart->Team == GetTeam())
+		{
+			MyTeamPlayerStarts.Add(TeamPlayerStart);
+		}
+	}
+	// pick on spot
+	if (!MyTeamPlayerStarts.IsEmpty())
+	{
+		ATeamPlayerStart* ChosenPlayerStart = MyTeamPlayerStarts[FMath::RandRange(0, MyTeamPlayerStarts.Num()-1)];
+		SetActorLocationAndRotation(ChosenPlayerStart->GetActorLocation(), ChosenPlayerStart->GetActorRotation());
+	}
+}
+
+void ABlasterCharacter::OnPlayerStateInitialized()
+{
+	BlasterPlayerState->AddToScore(0.f);
+	BlasterPlayerState->AddToDefeats(0);
+	SetTeamColor(BlasterPlayerState->GetTeam());
 }
 
 // deal with initialization
@@ -494,9 +554,7 @@ void ABlasterCharacter::PollInit()
 		BlasterPlayerState = GetPlayerState<ABlasterPlayerState>();
 		if (BlasterPlayerState)
 		{
-			BlasterPlayerState->AddToScore(0.f);
-			BlasterPlayerState->AddToDefeats(0);
-			SetTeamColor(BlasterPlayerState->GetTeam());
+			OnPlayerStateInitialized();
 			ABlasterGameState* BlasterGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
 			if (BlasterGameState && BlasterGameState->TopScorePlayer.Contains(BlasterPlayerState))
 			{
@@ -573,8 +631,8 @@ void ABlasterCharacter::MulticastElim_Implementation(bool bPlayerLeftGame)
 		CrownComponent->DestroyComponent();
 	}
 	bool bUseSniperAiming = IsLocallyControlled() && BlasterPlayerController &&
-		Combat && Combat->bIsAiming && Combat->EquippedWeapon &&
-		Combat->EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle; 
+		BlasterCombatComp && BlasterCombatComp->bIsAiming && BlasterCombatComp->EquippedWeapon &&
+		BlasterCombatComp->EquippedWeapon->GetWeaponType() == EWeaponType::EWT_SniperRifle; 
 	if (bUseSniperAiming)
 	{
 		BlasterPlayerController->SetHUDSniperScope(false);
@@ -682,36 +740,48 @@ void ABlasterCharacter::LookUp(float Value)
 
 void ABlasterCharacter::HoverButtonPressed()
 {
+	if (BlasterCombatComp && BlasterCombatComp->bHoldingTheFlag)
+	{
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("Hover Return")));
+		return;
+	}
 	ServerHoverButtonPressed();
+	if (!HasAuthority())
+	{
+		PlayHoverMontage();	
+	}
 }
 
 void ABlasterCharacter::ServerHoverButtonPressed_Implementation()
 {
 	bHovering = !bHovering;
-	//  类似pubg 的 alt
+	PlayHoverMontage();
 }
 
 void ABlasterCharacter::OnRep_bHovering()
 {
-
+	if (bHovering)
+	{
+		
+	}
 }
 
 void ABlasterCharacter::EquipButtonPressed()
 {
-	//
-	if (!Combat)	return;
-	if (Combat->CombatState == ECombatState::ECS_UnOccupied)
+	if (!BlasterCombatComp)					return;
+	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	if (BlasterCombatComp->CombatState == ECombatState::ECS_UnOccupied)
 	{
 		ServerEquipButtonPressed();	
 	}
-	bool bSwap = Combat->CanSwapWeapon()
+	bool bSwap = BlasterCombatComp->CanSwapWeapon()
 		&& !HasAuthority()
-		&& Combat->CombatState == ECombatState::ECS_UnOccupied
+		&& BlasterCombatComp->CombatState == ECombatState::ECS_UnOccupied
 		&& OverlappingWeapon == nullptr;
 	if (bSwap)
 	{
 		PlaySwapMontage();
-		Combat->CombatState = ECombatState::ECS_SwapWeapons;
+		BlasterCombatComp->CombatState = ECombatState::ECS_SwapWeapons;
 		bFinishSwapping = false;
 	} else
 	{
@@ -729,11 +799,13 @@ void ABlasterCharacter::EquipButtonPressed()
 
 void ABlasterCharacter::DropButtonPressed()
 {
+	if (BlasterCombatComp && BlasterCombatComp->bHoldingTheFlag)	return;
 	ServerDropButtonPressed();
 }
 
 void ABlasterCharacter::CrouchButtonPressed()
 {
+	if (BlasterCombatComp && BlasterCombatComp->bHoldingTheFlag)	return;
 	if (bIsCrouched)
 	{
 		UnCrouch();	
@@ -746,34 +818,31 @@ void ABlasterCharacter::CrouchButtonPressed()
 
 void ABlasterCharacter::AimButtonPressed()
 {
-	if (Combat)
-	{
-		Combat->SetAiming(true);
-	}
+	if (!BlasterCombatComp)					return;
+	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	BlasterCombatComp->SetAiming(true);
 }
 
 void ABlasterCharacter::AimButtonReleased()
 {
-	if (Combat)
-	{
-		Combat->SetAiming(false);
-	}
+	if (!BlasterCombatComp)	return;
+	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	BlasterCombatComp->SetAiming(false);
 }
 
 void ABlasterCharacter::ReloadButtonPressed()
 {
-	if (Combat)
-	{
-		Combat->Reload();
-	}	
+	if (!BlasterCombatComp)					return;
+	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	BlasterCombatComp->Reload();
 }
 
 void ABlasterCharacter::GrenadeButtonPressed()
 {
-	if (Combat)
-	{
-		Combat->ThrowGrenade();
-	}	
+	if (!BlasterCombatComp)					return;
+	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("GrenadeButtonPressed")));
+	BlasterCombatComp->ThrowGrenade();
 }
 
 void ABlasterCharacter::CalculateAO_Pitch()
@@ -794,7 +863,7 @@ void ABlasterCharacter::CalculateAO_Pitch()
  */
 void ABlasterCharacter::AimOffset(float DeltaTime)
 {
-	if (Combat && Combat->EquippedWeapon == nullptr) return;
+	if (BlasterCombatComp && BlasterCombatComp->EquippedWeapon == nullptr) return;
 	// 只在idle的时候生效
 	bool isInAir = GetCharacterMovement()->IsFalling();
 	float Speed = CalculateSpeed();
@@ -833,7 +902,7 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 */
 void ABlasterCharacter::SimProxiesTurn()
 {
-	if (Combat == nullptr || Combat->EquippedWeapon == nullptr)	return;
+	if (BlasterCombatComp == nullptr || BlasterCombatComp->EquippedWeapon == nullptr)	return;
 	// in sim proxies, we don't use rotate root bone
 	bRotateRootBone = false;
 
@@ -887,6 +956,7 @@ void ABlasterCharacter::TurnInPlace(float DeltaTime)
 
 void ABlasterCharacter::Jump()
 {
+	if (BlasterCombatComp && BlasterCombatComp->bHoldingTheFlag)	return;
 	if (bIsCrouched)
 	{
 		UnCrouch();
@@ -898,30 +968,21 @@ void ABlasterCharacter::Jump()
 
 void ABlasterCharacter::FireButtonPressed()
 {
-	if (Combat)
-	{
-		Combat->FireButtonPressed(true);
-	}
-	/*// debug delete in one sec
-	AGameModeBase* mode = UGameplayStatics::GetGameMode(this);
-	if (GEngine && mode)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green,
-			FString::Printf(TEXT("GameMode is %s"), *mode->GetName()));
-	}*/
+	if (!BlasterCombatComp)					return;
+	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	BlasterCombatComp->FireButtonPressed(true);
 }
 
 void ABlasterCharacter::FireButtonReleased()
 {
-	if (Combat)
-	{
-		Combat->FireButtonPressed(false);
-	}	
+	if (!BlasterCombatComp)					return;
+	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	BlasterCombatComp->FireButtonPressed(false);
 }
 
 void ABlasterCharacter::PlayHitReactMontage()
 {
-	if (!Combat || !Combat->EquippedWeapon)	return;
+	if (!BlasterCombatComp || !BlasterCombatComp->EquippedWeapon)	return;
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && HitReactMontage)
 	{
@@ -995,21 +1056,21 @@ void ABlasterCharacter::ReceiveDamage(AActor* DamagedActor, float Damage, const 
  */
 void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 {
-	if (!Combat)	return;
+	if (!BlasterCombatComp)	return;
 	if (OverlappingWeapon)
 	{
-		Combat->EquipWeapon(OverlappingWeapon);
+		BlasterCombatComp->EquipWeapon(OverlappingWeapon);
 	} else	// 无 Overlap Weapon且 可以切换武器
 	{
-		if (Combat->CanSwapWeapon())
+		if (BlasterCombatComp->CanSwapWeapon())
 		{
-			Combat->SwapWeapons();
-		} else if (Combat->EquippedWeapon == nullptr && Combat->SecondaryWeapon != nullptr)
+			BlasterCombatComp->SwapWeapons();
+		} else if (BlasterCombatComp->EquippedWeapon == nullptr && BlasterCombatComp->SecondaryWeapon != nullptr)
 		{
-			Combat->TakeSecondaryWeapon();
-		} else if (Combat->EquippedWeapon != nullptr && Combat->SecondaryWeapon == nullptr)
+			BlasterCombatComp->TakeSecondaryWeapon();
+		} else if (BlasterCombatComp->EquippedWeapon != nullptr && BlasterCombatComp->SecondaryWeapon == nullptr)
 		{
-			Combat->PutSecondaryWeapon();
+			BlasterCombatComp->PutSecondaryWeapon();
 		}
 	}
 }
@@ -1059,9 +1120,9 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 
 void ABlasterCharacter::ServerDropButtonPressed_Implementation()
 {
-	if (Combat && Combat->EquippedWeapon)
+	if (BlasterCombatComp && BlasterCombatComp->EquippedWeapon)
 	{
-		Combat->DropWeapon();
+		BlasterCombatComp->DropWeapon();
 	}
 }
 
@@ -1069,15 +1130,15 @@ void ABlasterCharacter::SetCharacterVisibility(bool bVisiable)
 {
 	if (GetMesh() == nullptr)	return;
 	GetMesh()->SetVisibility(bVisiable);
-	if (Combat && Combat->EquippedWeapon && Combat->EquippedWeapon->GetWeaponMesh())
+	if (BlasterCombatComp && BlasterCombatComp->EquippedWeapon && BlasterCombatComp->EquippedWeapon->GetWeaponMesh())
 	{
-		Combat->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = !bVisiable;
+		BlasterCombatComp->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = !bVisiable;
 	}
 }
 
 void ABlasterCharacter::HideCharacterIfCameraClose()
 {
-	if (!IsLocallyControlled() && FollowCamera == nullptr)		return;
+	if (!IsLocallyControlled() || FollowCamera == nullptr)		return;
 	float distance = (FollowCamera->GetComponentLocation() - GetActorLocation()).Size();
 	if (distance < CameraThreshold)
 	{

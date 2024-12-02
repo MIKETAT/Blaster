@@ -38,7 +38,7 @@ private:
 	int32 Defeats;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Team)
-	ETeam Team = ETeam::ET_None;
+	ETeam Team = ETeam::ET_None;	// 默认改为Blue方便测试夺旗模式
 
 	UFUNCTION()
 	void OnRep_Team();

@@ -35,6 +35,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PostInitializeComponents() override;
 	void SetOverlappingWeapon(AWeapon* OverlapWeapon);
+	void SetHoldingTheFlag(bool bHolding);
 	bool isWeaponEquipped() const;
 	bool isAiming() const;
 	FORCEINLINE float GetAO_Yaw() const { return AO_Yaw; }
@@ -45,9 +46,12 @@ public:
 	// Play Montages
 	void PlayFireMontage(bool bAiming);
 	void PlayReloadMontage();
+	void PlayHoverMontage();
+	void PlayHitReactMontage();
 	void PlayElimMontage();
 	void PlayThrowGrenadeMontage();
 	void PlaySwapMontage();
+	
 	FVector GetHitTarget() const;
 	FORCEINLINE AWeapon* GetOverlappingWeapon() const { return OverlappingWeapon; }
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
@@ -72,13 +76,15 @@ public:
 	FORCEINLINE float GetMaxShield() const { return MaxShield; }
 	FORCEINLINE ABlasterPlayerState* GetBlasterPlayerState() const { return BlasterPlayerState == nullptr ? GetPlayerState<ABlasterPlayerState>() : BlasterPlayerState; }
 	FORCEINLINE UAnimMontage* GetReloadMontage() const { return ReloadMontage; }
-	FORCEINLINE UCombatComponent* GetCombat() const { return Combat; }
+	FORCEINLINE UCombatComponent* GetCombat() const { return BlasterCombatComp; }
 	FORCEINLINE UBuffComponent* GetBuff() const { return Buff; }
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
 	FORCEINLINE bool IsHovering() const { return bHovering;}
+	FORCEINLINE bool IsHoldingTheFlag() const;
 	FORCEINLINE class ULagCompensationComponent* GetLagCompensationComponent() const { return LagCompensation; }
 	bool IsLocallyReloading();
 	ECombatState GetCombatState() const;
+	ETeam GetTeam();
 	
 	float CalculateSpeed();
 	void UpdateHealthHUD();
@@ -90,8 +96,10 @@ public:
 
 	// Only on Server
 	void Elim(bool bPlayerLeftGame);
+	void SetSpawnPoint();
+	void OnPlayerStateInitialized();
 
-	
+
 	void SetTeamColor(ETeam TeamToSet);
 	
 	// 处理初始化相关的逻辑，
@@ -117,6 +125,7 @@ public:
 	bool bFinishSwapping = true;
 protected:
 	virtual void BeginPlay() override;
+	void RotateInPlace(float DeltaTime);
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 	void Turn(float Value);
@@ -136,7 +145,6 @@ protected:
 	virtual void Jump() override;
 	void FireButtonPressed();
 	void FireButtonReleased();
-	void PlayHitReactMontage();
 	// tood damage delegates in unreal
 	// we can bind function which has signature below to delegate function like onTakenAnyDamage
 	UFUNCTION()			// todo find out why it has to be UFUNCTION()
@@ -212,7 +220,7 @@ private:
 	class AWeapon* OverlappingWeapon;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	class UCombatComponent* Combat;
+	class UCombatComponent* BlasterCombatComp;
 	
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	class UBuffComponent* Buff;
@@ -245,6 +253,9 @@ private:
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* ElimMontage;
 
+	UPROPERTY(EditAnywhere, Category= Combat)
+	UAnimMontage* HoverMontage;
+	
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* ReloadMontage;
 	

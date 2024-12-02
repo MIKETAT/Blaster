@@ -50,6 +50,9 @@ public:
 	void FinishSwap();
 
 	UFUNCTION(BlueprintCallable)
+	void TestNotify();
+	
+	UFUNCTION(BlueprintCallable)
 	void FinishSwapAttachWeapons();
 	
 	UFUNCTION(BlueprintCallable)
@@ -132,12 +135,18 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_SecondaryWeapon)
 	AWeapon* SecondaryWeapon;
 
+	UPROPERTY(ReplicatedUsing = OnRep_TheFlag)
+	AWeapon* TheFlag;
+	
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AWeapon> DefaultWeaponClass;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_bIsAiming)
 	bool bIsAiming = false;
 
+	UPROPERTY(ReplicatedUsing = OnRep_bHoldingTheFlag)
+	bool bHoldingTheFlag = false;
+	
 	bool bAimingButtonPressed = false;		// is Aiming Button  pressed now
 
 	bool bLocallyReloading = false;			// same as bAimingButtonPressed. record whether we are reloading locally
@@ -170,6 +179,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_bIsAiming();
+
+	UFUNCTION()
+	void OnRep_bHoldingTheFlag();
 	
 	UFUNCTION()
 	void OnRep_CarriedAmmo();
@@ -185,6 +197,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_SecondaryWeapon();
+
+	UFUNCTION()
+	void OnRep_TheFlag();
 
 	TMap<EWeaponType, int32> CarriedAmmoMap;
 	/***
@@ -219,6 +234,7 @@ private:
 	void DropOrDestroyWeapon(AWeapon* WeaponToHandle);
 	void AttachActorToRightHand(AActor* ActorToAttach);
 	void AttachActorToLeftHand(AActor* ActorToAttach);
+	void AttachFlagToLeftHand(AWeapon* Flag);
 	void AttachActorToBackpack(AActor* ActorToAttach);
 	// update ammo and the hud
 	void ReloadAmmo();

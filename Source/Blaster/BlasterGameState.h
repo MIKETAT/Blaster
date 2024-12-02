@@ -41,8 +41,6 @@ private:
 	/**
 	 * Team
 	 */
-
-
 	UPROPERTY(ReplicatedUsing = OnRep_TeamRedScore)
 	int32 TeamRedScore = 0;
 
