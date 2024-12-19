@@ -165,12 +165,13 @@ private:
 	UPROPERTY(EditAnywhere)
 	int32 MaxAmmoAmount = 500;
 
-	UPROPERTY(ReplicatedUsing = OnRep_Grenades)
-	int32 Grenades = 5;
 
 	UPROPERTY(EditAnywhere)
 	int32 MaxGrenades = 5;
-
+	
+	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_Grenades)
+	int32 Grenades = MaxGrenades;
+	
 	UPROPERTY(EditAnywhere)
 	int32 InitialAmmoAmount = 30;
 

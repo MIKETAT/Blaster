@@ -31,12 +31,9 @@ void ATeamsGameMode::Logout(AController* Exiting)
 
 void ATeamsGameMode::HandleMatchHasStarted()
 {
-	DebugUtil::PrintMsg(FString::Printf(TEXT("ATeamsGameMode, HandleMatchHasStarted")), FColor::Green);
 	Super::HandleMatchHasStarted();
 	ABlasterGameState* BGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
 	if (!BGameState)	return;
-	DebugUtil::PrintMsg(FString::Printf(TEXT("ATeamsGameMode, 111111")), FColor::Green);
-	DebugUtil::PrintMsg(FString::Printf(TEXT("Player Array Num = %d"), BGameState->PlayerArray.Num()), FColor::Green);
 	for (auto PState : BGameState->PlayerArray)
 	{
 		ABlasterPlayerState* BPState = Cast<ABlasterPlayerState>(PState);
@@ -55,7 +52,17 @@ void ATeamsGameMode::HandleMatchHasStarted()
 			}
 		}
 	}
-	DebugUtil::PrintMsg(FString::Printf(TEXT("ATeamsGameMode, 2222222")), FColor::Green);
+}
+
+// 有团队得分达到要求时结束游戏
+bool ATeamsGameMode::ShouldEndGame()
+{
+	ABlasterGameState* BGState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
+	if (BGState)
+	{
+		return BGState->GetBlueTeamScore() >= TeamWinningScore || BGState->GetRedTeamScore() >= TeamWinningScore;	
+	}
+	return false;
 }
 
 void ATeamsGameMode::PostLogin(APlayerController* NewPlayer)
@@ -82,8 +89,8 @@ void ATeamsGameMode::PostLogin(APlayerController* NewPlayer)
 void ATeamsGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 	ABlasterPlayerController* VictimController, ABlasterPlayerController* AttackerController)
 {
+	// TeamMatch模式下Super不会在有玩家死亡时直接判断游戏是否结束
 	Super::PlayerEliminated(EliminatedCharacter, VictimController, AttackerController);
-	
 	ABlasterGameState* BGState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
 	ABlasterPlayerState* BPState = AttackerController ? Cast<ABlasterPlayerState>(AttackerController->PlayerState): nullptr;
 	if (BGState && BPState)
@@ -96,6 +103,10 @@ void ATeamsGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 			BGState->TeamRedScores();
 		}
 	}
+	if (ShouldEndGame())
+	{
+		EndMatch();
+	}
 }
 
 float ATeamsGameMode::CalculateDamage(AController* AttackerController, AController* VictimController, float BaseDamage)
@@ -107,7 +118,7 @@ float ATeamsGameMode::CalculateDamage(AController* AttackerController, AControll
 	if (!AttackerPlayerState || !VictimPlayerState)		return BaseDamage;
 	if (AttackerPlayerState->GetTeam() == VictimPlayerState->GetTeam())
 	{
-		DebugUtil::PrintMsg(FString("On The Same Team"), FColor::Orange);
+		DebugUtil::LogMsg(FString("On The Same Team"));
 		DebugUtil::PrintMsg(FString::Printf(TEXT("Team is %d"), AttackerPlayerState->GetTeam()), FColor::Cyan);
 		DebugUtil::PrintMsg(FString::Printf(TEXT("Team is %d"), VictimPlayerState->GetTeam()), FColor::Cyan);
 		return 0.f;

@@ -28,10 +28,12 @@ public:
 	FORCEINLINE int32 GetTopScore() const { return TopScore; }
 	
 	UPROPERTY(ReplicatedUsing=OnRep_TopScorePlayer)
-	TArray<class ABlasterPlayerState*> TopScorePlayer;
-	
+	TArray<ABlasterPlayerState*> TopScorePlayer;
+
+	UPROPERTY()
 	TArray<ABlasterPlayerState*> RedTeam;
-	
+
+	UPROPERTY()
 	TArray<ABlasterPlayerState*> BlueTeam;
 protected:
 

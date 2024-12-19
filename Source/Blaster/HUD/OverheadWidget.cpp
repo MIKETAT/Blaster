@@ -19,6 +19,7 @@ void UOverheadWidget::SetDisplayText(FString TextToDisplay)
 
 void UOverheadWidget::ShowPlayerNetRole(APawn* InPawn)
 {
+	/*
 	FString RemoteRole;
 	switch (InPawn->GetRemoteRole())
 	{
@@ -53,11 +54,6 @@ void UOverheadWidget::ShowPlayerNetRole(APawn* InPawn)
 		break;
 	}
 
-	//FString PlayerName = InPawn->GetPlayerState()->GetPlayerName();
-	//FString RemoteRoleString = FString::Printf(TEXT("Remote Role is %s, and PlayerName is %s"), *Role, *PlayerName);
-	//FString RemoteRoleString = FString::Printf(TEXT("Remote Role is %s"), *RemoteRole);
-	//FString RoleText = FString::Printf(TEXT("%s / %s"), *RemoteRole, *Role);
-	
 	ABlasterPlayerState* BPState = Cast<ABlasterPlayerState>(InPawn->GetPlayerState());
 	
 	FString RoleText;
@@ -81,7 +77,14 @@ void UOverheadWidget::ShowPlayerNetRole(APawn* InPawn)
 	{
 		EquipWeaponName = BlasterCharacter->GetCombat()->GetEquippedWeapon()->GetWeaponName().ToString();
 	}
-	SetDisplayText(EquipWeaponName);
+	*/
+	if (ABlasterCharacter* MyCharacter = Cast<ABlasterCharacter>(InPawn))
+	{
+		SetDisplayText(MyCharacter->GetName());	
+	} else
+	{
+		SetDisplayText(FString::Printf(TEXT("NoName")));	
+	}
 }
 
 void UOverheadWidget::NativeDestruct()

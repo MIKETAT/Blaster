@@ -82,13 +82,12 @@ ABlasterCharacter::ABlasterCharacter()
 
 void ABlasterCharacter::ConstructHitBox()
 {
-	DebugUtil::LogMsg(FString::Printf(TEXT("Constructing Hit Box")));
 	head = CreateDefaultSubobject<UBoxComponent>(TEXT("head"));
 	head->SetupAttachment(GetMesh(), FName("head"));
 	HitCollisionBoxes.Add(FName("head"), head);
 	
 	pelvis = CreateDefaultSubobject<UBoxComponent>(TEXT("pelvis"));
-	pelvis->SetupAttachment(GetMesh(), FName("pelvis "));
+	pelvis->SetupAttachment(GetMesh(), FName("pelvis"));
 	HitCollisionBoxes.Add(FName("pelvis"), pelvis);
 
 	spine_02 = CreateDefaultSubobject<UBoxComponent>(TEXT("spine_02"));
@@ -165,15 +164,14 @@ void ABlasterCharacter::ConstructHitBox()
 			Box.Value->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
-	
 }
 
 void ABlasterCharacter::Destroyed()
 {
 	Super::Destroyed();
-	if (ElimBotComponent)
+	if (ElimBotEffectComponent)
 	{
-		ElimBotComponent->DestroyComponent();	
+		ElimBotEffectComponent->DestroyComponent();		
 	}
 }
 
@@ -282,6 +280,7 @@ void ABlasterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME_CONDITION(ABlasterCharacter, OverlappingWeapon, COND_OwnerOnly);
 	DOREPLIFETIME(ABlasterCharacter, Health);
 	DOREPLIFETIME(ABlasterCharacter, Shield);
+	DOREPLIFETIME(ABlasterCharacter, bHovering);
 }
 
 void ABlasterCharacter::PostInitializeComponents()
@@ -364,7 +363,6 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 void ABlasterCharacter::PlayReloadMontage()
 {
 	if (!BlasterCombatComp || !BlasterCombatComp->EquippedWeapon)	return;
-	//PlayAnimMontage(FireWeaponMontage);
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && ReloadMontage)
 	{
@@ -375,26 +373,26 @@ void ABlasterCharacter::PlayReloadMontage()
 			case EWeaponType::EWT_AssaultRifle:
 				SectionName = FName("Rifle");
 				break;
-		case EWeaponType::EWT_RocketLauncher:
-				SectionName = FName("RocketLauncher");	// 
-			break;
-		case EWeaponType::EWT_Pistol:
-			SectionName = FName("Pistol");	
-			break;
-		case EWeaponType::EWT_SubmachineGun:
-			SectionName = FName("Pistol");	// Submachinegun 和 pistol 一样的换弹动画
-			break;
-		case EWeaponType::EWT_Shotgun:
-			SectionName = FName("Shotgun");
-			break;
-		case EWeaponType::EWT_SniperRifle:
-			SectionName = FName("SniperRifle");
-			break;
-		case EWeaponType::EWT_GrenadeLauncher:
-			SectionName = FName("GrenadeLauncher");
-			break;
-		default:
-			SectionName = FName("Rifle");
+			case EWeaponType::EWT_RocketLauncher:
+					SectionName = FName("RocketLauncher");
+				break;
+			case EWeaponType::EWT_Pistol:
+				SectionName = FName("Pistol");	
+				break;
+			case EWeaponType::EWT_SubmachineGun:
+				SectionName = FName("Pistol");
+				break;
+			case EWeaponType::EWT_Shotgun:
+				SectionName = FName("Shotgun");
+				break;
+			case EWeaponType::EWT_SniperRifle:
+				SectionName = FName("SniperRifle");
+				break;
+			case EWeaponType::EWT_GrenadeLauncher:
+				SectionName = FName("GrenadeLauncher");
+				break;
+			default:
+				SectionName = FName("Rifle");
 		}
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
@@ -402,6 +400,7 @@ void ABlasterCharacter::PlayReloadMontage()
 
 void ABlasterCharacter::PlayHoverMontage()
 {
+	if (!BlasterCombatComp || BlasterCombatComp->EquippedWeapon)	return;
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && HoverMontage)
 	{
@@ -421,10 +420,10 @@ void ABlasterCharacter::PlayElimMontage()
 
 void ABlasterCharacter::PlayThrowGrenadeMontage()
 {
-	DebugUtil::PrintMsg(this, FString::Printf(TEXT("%s PlayThrowGrenadeMontage"), *this->GetName()));
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && ThrowGrenadeMontage)
 	{
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("%s PlayThrowGrenadeMontage, AnimInstance address is %p"), *this->GetName(), AnimInstance));
 		AnimInstance->Montage_Play(ThrowGrenadeMontage);
 	}
 }
@@ -520,6 +519,7 @@ void ABlasterCharacter::Elim(bool bPlayerLeftGame)
 // Set Team Player Start Point once PlayerState(Team) is initialized
 void ABlasterCharacter::SetSpawnPoint()
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("Call SetSpawnPoint")));
 	TArray<AActor*> AllPlayerStart;
 	UGameplayStatics::GetAllActorsOfClass(this, ATeamPlayerStart::StaticClass(), AllPlayerStart);
 	TArray<ATeamPlayerStart*> MyTeamPlayerStarts;
@@ -536,6 +536,7 @@ void ABlasterCharacter::SetSpawnPoint()
 	{
 		ATeamPlayerStart* ChosenPlayerStart = MyTeamPlayerStarts[FMath::RandRange(0, MyTeamPlayerStarts.Num()-1)];
 		SetActorLocationAndRotation(ChosenPlayerStart->GetActorLocation(), ChosenPlayerStart->GetActorRotation());
+		DebugUtil::LogMsg(FString::Printf(TEXT("MyTeamPlayerStarts Not Empty")));
 	}
 }
 
@@ -544,6 +545,7 @@ void ABlasterCharacter::OnPlayerStateInitialized()
 	BlasterPlayerState->AddToScore(0.f);
 	BlasterPlayerState->AddToDefeats(0);
 	SetTeamColor(BlasterPlayerState->GetTeam());
+	SetSpawnPoint();
 }
 
 // deal with initialization
@@ -613,7 +615,7 @@ void ABlasterCharacter::MulticastElim_Implementation(bool bPlayerLeftGame)
 	if (ElimBotEffect)
 	{
 		FVector ElimBotSpawnPoint(GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z + 200.f);
-		ElimBotComponent = UGameplayStatics::SpawnEmitterAtLocation(
+		ElimBotEffectComponent = UGameplayStatics::SpawnEmitterAtLocation(
 			GetWorld(),
 			ElimBotEffect,
 			ElimBotSpawnPoint,
@@ -675,9 +677,9 @@ void ABlasterCharacter::ElimTimerFinish()
 	{
 		GetBlasterGameMode()->RequestRespawn(this, Controller);	
 	}
-	if (ElimBotComponent)
+	if (ElimBotEffectComponent)
 	{
-		ElimBotComponent->DestroyComponent();
+		ElimBotEffectComponent->DestroyComponent();
 	}
 	if (bLeftGame && IsLocallyControlled())
 	{
@@ -742,34 +744,36 @@ void ABlasterCharacter::HoverButtonPressed()
 {
 	if (BlasterCombatComp && BlasterCombatComp->bHoldingTheFlag)
 	{
-		DebugUtil::PrintMsg(this, FString::Printf(TEXT("Hover Return")));
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("Holding Flag, Hover Return")));
 		return;
 	}
 	ServerHoverButtonPressed();
-	if (!HasAuthority())
-	{
-		PlayHoverMontage();	
-	}
+	//PlayHoverMontage();	
 }
 
 void ABlasterCharacter::ServerHoverButtonPressed_Implementation()
 {
 	bHovering = !bHovering;
-	PlayHoverMontage();
+	if (bHovering)
+	{
+		PlayHoverMontage();	
+	}
 }
 
 void ABlasterCharacter::OnRep_bHovering()
 {
 	if (bHovering)
 	{
-		
+		PlayHoverMontage();
 	}
 }
 
 void ABlasterCharacter::EquipButtonPressed()
 {
-	if (!BlasterCombatComp)					return;
-	if (BlasterCombatComp->bHoldingTheFlag)	return;
+	if (!BlasterCombatComp || BlasterCombatComp->bHoldingTheFlag)	return;
+	if (GetCharacterMovement()->IsFalling())	return;
+	// 当前持枪且处于开火状态中, 此时不允许 装备武器/切换武器/收起武器等
+	if (BlasterCombatComp->EquippedWeapon && !BlasterCombatComp->EquippedWeapon->CanFire())		return;
 	if (BlasterCombatComp->CombatState == ECombatState::ECS_UnOccupied)
 	{
 		ServerEquipButtonPressed();	
@@ -870,6 +874,7 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 	if (Speed == 0.f && !isInAir) {
 		bRotateRootBone = true;	// only when we are standing and not jumping
 		FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		// 算出和上一帧的rotaion的夹角
 		FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAnimRotation);
 		AO_Yaw = DeltaAimRotation.Yaw;
 		bUseControllerRotationYaw = true;
@@ -889,7 +894,6 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 		bUseControllerRotationYaw = true;
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;	// 运动的时候不转身
 	}
-	
 	CalculateAO_Pitch();
 }
 
@@ -910,7 +914,7 @@ void ABlasterCharacter::SimProxiesTurn()
 	if (Speed > 0.f)
 	{
 		TurningInPlace = ETurningInPlace::ETIP_NotTurning;	// Runing 不需要转身动画
-		return;;
+		return;
 	}
 	
 	ProxyRotationLastFrame = ProxyCurrentRotation;
@@ -987,14 +991,13 @@ void ABlasterCharacter::PlayHitReactMontage()
 	if (AnimInstance && HitReactMontage)
 	{
 		AnimInstance->Montage_Play(HitReactMontage);
-		FName SectionName = FName("FromFront");
+		FName SectionName = FName("FromFront");		// todo use more sections
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
 
 void ABlasterCharacter::SetTeamColor(ETeam TeamToSet)
 {
-	DebugUtil::PrintMsg(FString::Printf(TEXT("SetTeamColor")), FColor::Green);
 	switch (TeamToSet)
 		{
 		case ETeam::ET_None:

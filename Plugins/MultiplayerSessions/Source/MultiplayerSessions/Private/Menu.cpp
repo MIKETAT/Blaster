@@ -152,7 +152,7 @@ void UMenu::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
 			SessionInterface->GetResolvedConnectString(NAME_GameSession, Address);
 
 			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, FString::Printf(TEXT("Address = %s"), *Address));
-			
+			UE_LOG(LogTemp, Error, TEXT("Clinet is going travel to %s"), *Address)
 			APlayerController* PlayerController = GetGameInstance()->GetFirstLocalPlayerController();
 			if (PlayerController)
 			{

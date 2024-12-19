@@ -16,7 +16,6 @@
 void AHitScanWeapon::Fire(const FVector& HitTarget) 
 {
 	Super::Fire(HitTarget);
-	DebugUtil::PrintMsg(FString::Printf(TEXT("HitScanWeapon Firing")));
 	APawn* InstigatorOwner = Cast<APawn>(GetOwner());
 	if (InstigatorOwner == nullptr)	return;
 	APlayerController* InstigatorController = Cast<APlayerController>(InstigatorOwner->GetController());
@@ -31,7 +30,7 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 		UWorld* World = GetWorld();
 		if (!World)		return;
 		WeaponHit(Start, End, HitResult);
-		DebugUtil::PrintMsg(HitResult.BoneName, FColor::Blue);
+		//DebugUtil::PrintMsg(HitResult.BoneName, FColor::Blue);
 		if (HitResult.bBlockingHit)
 		{
 			// 命中人物
@@ -44,14 +43,14 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 				bool bUseAuthDamage = !bUseServerSideRewind || BlasterOwner->IsLocallyControlled();
 				if (HasAuthority() && bUseAuthDamage)	
 				{
-					DebugUtil::PrintMsg(TEXT("Apply Damage Directly"));
+					//DebugUtil::PrintMsg(TEXT("Apply Damage Directly"));
 					UGameplayStatics::ApplyDamage(
 					HitCharacter,
 					DamageToCause,
 					InstigatorController,
 					this,
 					UDamageType::StaticClass());
-					DebugUtil::PrintMsg(FString::Printf(TEXT("Cause Damage %f"), DamageToCause), FColor::Red);
+					//DebugUtil::PrintMsg(FString::Printf(TEXT("Cause Damage %f"), DamageToCause), FColor::Red);
 				}
 				if (!HasAuthority() && bUseServerSideRewind)  // client and use ServerSideRewind
 				{
@@ -59,7 +58,7 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					BlasterController = BlasterController == nullptr ? Cast<ABlasterPlayerController>(InstigatorController) : BlasterController;
 					if (BlasterOwner && BlasterController && BlasterOwner->GetLagCompensationComponent() && BlasterOwner->IsLocallyControlled())
 					{
-						DebugUtil::PrintMsg(TEXT("Apply Damage Using Server Request"));
+						//DebugUtil::PrintMsg(TEXT("Apply Damage Using Server Request"));
 						BlasterOwner->GetLagCompensationComponent()->ServerRequestScore(
 							HitCharacter,
 							Start,

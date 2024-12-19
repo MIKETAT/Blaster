@@ -9,6 +9,7 @@
 #include "Casing.h"
 #include "WeaponTypes.h"
 #include "Blaster/BlasterComponent/CombatComponent.h"
+#include "Blaster/HUD/PickupWidget.h"
 #include "Blaster/Utils/DebugUtil.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -41,6 +42,7 @@ AWeapon::AWeapon()
 
 	PickUpWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("PickUpWidget"));
 	PickUpWidget->SetupAttachment(RootComponent);
+	
 	WeaponState = EWeaponState::EWS_Initial;
 }
 
@@ -72,6 +74,10 @@ void AWeapon::BeginPlay()
 	if (PickUpWidget)
 	{
 		PickUpWidget->SetVisibility(false);
+		if (UPickupWidget* WidgetPickup = Cast<UPickupWidget>(PickUpWidget->GetUserWidgetObject()))
+		{
+			WidgetPickup->SetupPickupText(this);
+		}
 	}
 	// 客户端本地即可设置碰撞体(pickup widget),但是装备武器必须放在server执行
 	AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -99,14 +105,14 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 
 void AWeapon::Fire(const FVector& HitTarget)
 {
-	DebugUtil::PrintMsg(FString::Printf(TEXT("Weapon %s Fired"), *GetWeaponName().ToString()), FColor::Purple);
+	/*DebugUtil::PrintMsg(FString::Printf(TEXT("Weapon %s Fired"), *GetWeaponName().ToString()), FColor::Purple);
 	if (bUseServerSideRewind)
 	{
 		DebugUtil::PrintMsg(FString::Printf(TEXT("Using Server Side Rewind")), FColor::Purple);
 	} else
 	{
 		DebugUtil::PrintMsg(FString::Printf(TEXT("Not Using Server Side Rewind")), FColor::Purple);
-	}
+	}*/
 	if (FireAnimation)
 	{
 		WeaponMesh->PlayAnimation(FireAnimation, false);

@@ -29,7 +29,7 @@ protected:
 	UParticleSystem* MuzzleFlash;
 
 	UPROPERTY(EditAnywhere)
-	USoundCue* FireSound;
+	class USoundCue* FireSound;
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* HitSound;

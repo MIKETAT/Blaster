@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "FlagZone.h"
 
 #include "Blaster/Character/BlasterCharacter.h"
@@ -39,25 +36,10 @@ void AFlagZone::BeginPlay()
 void AFlagZone::OnSphereOverlap(UPrimitiveComponent* OverlapComponent, AActor* OtherActor,
 	UPrimitiveComponent* OtherComponent, int32 OtherIndex, bool bFromSweep, const FHitResult& SweepHitResult)
 {
-	/*DebugUtil::PrintMsg(FString(TEXT("AFlagZone::OnSphereOverlap")));
-	DebugUtil::PrintMsg(Cast<ABlasterCharacter>(OtherActor), FString::Printf(TEXT("Overlap Character is %s"), *OtherActor->GetName()));
-	DebugUtil::PrintMsg( FString::Printf(TEXT("Overlap Actor is %s"), *OtherActor->GetName()));*/
 	AFlag* Flag = Cast<AFlag>(OtherActor);
-	if (!Flag)
-	{
-		DebugUtil::PrintMsg(FString(TEXT("Flag is null")));
-		return;
-	}
-	if (Flag && Flag->GetOwner() == nullptr)
-	{
-		DebugUtil::PrintMsg(Flag, FString::Printf(TEXT("Flag->GetOwner() == nullptr")));
-	}
-	
-	//if (Flag->GetTeam() != Team) DebugUtil::PrintMsg(FString(TEXT("Not The Same Team")));
 	if (Flag && Flag->GetTeam() == Team)	
 	{
-		ACaptureTheFlagGameMode* CaptureFlagGameMode = GetWorld()->GetAuthGameMode<ACaptureTheFlagGameMode>();
-		if (CaptureFlagGameMode)
+		if (ACaptureTheFlagGameMode* CaptureFlagGameMode = GetWorld()->GetAuthGameMode<ACaptureTheFlagGameMode>())
 		{
 			CaptureFlagGameMode->FlagCaptured(Flag, this);
 		}

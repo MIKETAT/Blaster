@@ -13,11 +13,13 @@
 #include "Blaster/BlasterTypes/Announcement.h"
 #include "Blaster/Utils/DebugUtil.h"
 #include "Blaster/Weapon/Weapon.h"
+#include "Components/AudioComponent.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Sound/SoundCue.h"
 
 // client加入游戏时请求server的状态
 void ABlasterPlayerController::ServerCheckMatchState_Implementation()
@@ -30,37 +32,25 @@ void ABlasterPlayerController::ServerCheckMatchState_Implementation()
 		MatchTime = GameMode->MatchTime;
 		LevelStartTime = GameMode->LevelStartTime;
 		MatchState = GameMode->GetMatchState();
-		ClientJoinGame(MatchState, MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
+		bShowTeamScore = GameMode->IsTeamMatch();	//
+		ClientJoinGame(MatchState, MatchTime, WarmupTime, CoolDownTime, LevelStartTime, bShowTeamScore);
 	}
-	if (HasAuthority())
-	{
-		UE_LOG(LogTemp, Error, TEXT("Server"));
-	} else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Client"));
-	}
-	//UE_LOG(LogTemp, Error, HasAuthority() ? TEXT("Server") : TEXT("Client"));
-	UE_LOG(LogTemp, Error, TEXT("in ServerCheckMatchState, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
-			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
+	/*UE_LOG(LogTemp, Error, TEXT("in ServerCheckMatchState, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
+			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);*/
 }
 
-void ABlasterPlayerController::ClientJoinGame_Implementation(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime)
+void ABlasterPlayerController::ClientJoinGame_Implementation(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime, bool bTeamMatch)
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("ClientJoinGame_Implementation, bShowTeamScore is %hs"), bShowTeamScore ? "true" : "false"));
 	MatchTime = matchTime;
 	WarmupTime = warmupTime;
 	CoolDownTime = coolDownTime;
 	LevelStartTime = levelStartTime;
 	MatchState = state;
-	SetMatchState(MatchState);
-	if (HasAuthority())
-	{
-		UE_LOG(LogTemp, Error, TEXT("Server"));
-	} else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Client"));
-	}
-	UE_LOG(LogTemp, Error, TEXT("in ClientJoinGame_Implementation, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
-			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);
+	bShowTeamScore = bTeamMatch;	// TeamMatch中client上这个变量一直不对，似乎和client的Controller加入游戏的时机有关。
+	SetMatchState(MatchState, bShowTeamScore);
+	/*UE_LOG(LogTemp, Error, TEXT("in ClientJoinGame_Implementation, MatchState = %s, MatchTime = %f, WarmupTime = %f, CoolDownTime = %f, LevelStartTime = %f"),
+			*MatchState.ToString(), MatchTime, WarmupTime, CoolDownTime, LevelStartTime);*/
 	if (BlasterHUD && MatchState == MatchState::WaitingToStart)
 	{
 		BlasterHUD->AddAnnouncement();
@@ -149,6 +139,7 @@ void ABlasterPlayerController::CheckPing(float DeltaSeconds)
 void ABlasterPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("Blaster Controller BeginPlay")));
 	ServerCheckMatchState();
 	bInitialize = false;
 }
@@ -187,6 +178,7 @@ void ABlasterPlayerController::ServerReportPingStatus_Implementation(bool bHighP
 
 void ABlasterPlayerController::OnRep_bShowTeamScore()
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("OnRep_bShowTeamScore")));
 	if (bShowTeamScore)
 	{
 		InitTeamScore();
@@ -289,7 +281,7 @@ void ABlasterPlayerController::SetHUDAmmo(int32 Ammo, int32 CarriedAmmo)
 		BlasterHUD->CharacterOverlay->AmmoAmount;
 	if (bHUDValid)
 	{
-		FString AmmoText = FString::Printf(TEXT("Ammo:%d/%d"), Ammo, CarriedAmmo);
+		FString AmmoText = FString::Printf(TEXT("%d/%d"), Ammo, CarriedAmmo);
 		BlasterHUD->CharacterOverlay->AmmoAmount->SetText(FText::FromString(AmmoText));
 	}
 }
@@ -472,14 +464,21 @@ void ABlasterPlayerController::HandleMatchWaitToStart()
 	{
 		BlasterHUD->AddAnnouncement();
 	}
-	//UGameplayStatics::SpawnSound2D(this)
+	if (LobbyMusic)
+	{
+		LobbyMusicComp = UGameplayStatics::SpawnSound2D(this, LobbyMusic, 0.5);	
+	}
 }
 
 void ABlasterPlayerController::HandleMatchStart(bool bTeamMatch)
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("ABlasterPlayerController HandleMatchStart, is team match ? %hs"), bTeamMatch ? "yes" : "no"));
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("And PlayerController Name is %s,"), *GetName()));
 	if (HasAuthority())
 	{
 		bShowTeamScore = bTeamMatch;
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("IN ABlasterPlayerController::HandleMatchStart(bool bTeamMatch), "
+												 "and HasAuthority, bShowTeamScore = bTeamMatc, and bTeamMatch is %hs"), bTeamMatch ? "true" : "false"));
 	}
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	if (BlasterHUD)
@@ -489,6 +488,7 @@ void ABlasterPlayerController::HandleMatchStart(bool bTeamMatch)
 		{
 			BlasterHUD->Announcement->SetVisibility(ESlateVisibility::Hidden);
 		}
+		// todo 这里有个client就return的逻辑， 有空看看不加怎么样
 		if (bTeamMatch)
 		{
 			InitTeamScore();
@@ -497,11 +497,20 @@ void ABlasterPlayerController::HandleMatchStart(bool bTeamMatch)
 			HideTeamScore();
 		}
 	}
+	// handle warmup music
+	if (LobbyMusicComp && LobbyMusicComp->IsPlaying())
+	{
+		//LobbyMusicComp->Stop();
+		LobbyMusicComp->SetActive(false);
+		LobbyMusicComp->SetPaused(true);
+		DebugUtil::LogMsg(FString::Printf(TEXT("Call Stop Music")));
+	}
+	
 }
 
 void ABlasterPlayerController::HandleMatchCoolDown()
 {
-	DebugUtil::PrintMsg(FString::Printf(TEXT("ABlasterPlayerController::HandleMatchCoolDown")));
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("ABlasterPlayerController::HandleMatchCoolDown")));
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	if (BlasterHUD)
 	{
@@ -511,7 +520,7 @@ void ABlasterPlayerController::HandleMatchCoolDown()
 			BlasterHUD->Announcement->AnnouncementText;
 		if (!bIsHUDValid)
 		{
-			DebugUtil::PrintMsg(GetOwner(), FString::Printf(TEXT("invalid HUD")));
+			DebugUtil::PrintMsg(this, FString::Printf(TEXT("invalid HUD")));
 			return;
 		}
 		BlasterHUD->Announcement->SetVisibility(ESlateVisibility::Visible);
@@ -527,6 +536,10 @@ void ABlasterPlayerController::SetMatchState(FName State, bool bTeamMatch)
 {
 	MatchState = State;
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
+
+	FString Text = FString::Printf(TEXT("PlayerController SetMatchState to %s, teamMatch is %hs, PlayerController Name is %s"),
+		*State.ToString(), bTeamMatch ? "true" : "false", *this->GetName());
+	DebugUtil::PrintMsg(this, Text);
 	
 	if (MatchState == MatchState::WaitingToStart)
 	{
@@ -544,16 +557,19 @@ void ABlasterPlayerController::SetMatchState(FName State, bool bTeamMatch)
 
 void ABlasterPlayerController::InitTeamScore()
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("InitTeamScore")));
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	if (bool bValid = BlasterHUD && BlasterHUD->CharacterOverlay && BlasterHUD->CharacterOverlay->RedTeamScore && BlasterHUD->CharacterOverlay->BlueTeamScore)
 	{
 		BlasterHUD->CharacterOverlay->RedTeamScore->SetText(FText::FromString("0"));
 		BlasterHUD->CharacterOverlay->BlueTeamScore->SetText(FText::FromString("0"));
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("InitTeamScore valid")));
 	}
 }
 
 void ABlasterPlayerController::HideTeamScore()
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("HideTeamScore")));
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	bool bValid =	BlasterHUD
 					&& BlasterHUD->CharacterOverlay
@@ -563,6 +579,7 @@ void ABlasterPlayerController::HideTeamScore()
 	{
 		BlasterHUD->CharacterOverlay->RedTeamScore->SetVisibility(ESlateVisibility::Hidden);
 		BlasterHUD->CharacterOverlay->BlueTeamScore->SetVisibility(ESlateVisibility::Hidden);
+		DebugUtil::PrintMsg(this, FString::Printf(TEXT("HideTeamScore valid")));
 	}
 }
 
@@ -652,6 +669,7 @@ void ABlasterPlayerController::PollInit()
 
 void ABlasterPlayerController::OnRep_MatchState()
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("OnRep_MatchState, Controller Name is %s"), *GetName()));
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
 	if (MatchState == MatchState::WaitingToStart)
 	{
@@ -659,7 +677,7 @@ void ABlasterPlayerController::OnRep_MatchState()
 	}
 	else if (MatchState == MatchState::InProgress)
 	{
-		HandleMatchStart();
+		HandleMatchStart(bShowTeamScore);
 	} else if (MatchState == MatchState::CoolDown)
 	{
 		HandleMatchCoolDown();

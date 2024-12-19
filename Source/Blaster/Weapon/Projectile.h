@@ -42,6 +42,10 @@ protected:
 	UFUNCTION()
 	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpluse, const FHitResult& Hit);
 	
+	FTimerHandle DestroyTimer;
+
+	UPROPERTY(EditAnywhere)
+	float DestroyTime;
 	
 	UPROPERTY(EditAnywhere)
 	class UBoxComponent* CollisionBox;
@@ -59,7 +63,7 @@ protected:
 	UParticleSystem* ImpactParticles;
 
 	UPROPERTY(EditAnywhere)
-	USoundCue* ImpactSound;
+	class USoundCue* ImpactSound;
 	
 	UPROPERTY(EditAnywhere)
 	UStaticMeshComponent* ProjectileMesh;
@@ -71,11 +75,6 @@ protected:
 	class UNiagaraComponent* TrailSystemComponent;
 
 private:
-	FTimerHandle DestroyTimer;
-
-	UPROPERTY(EditAnywhere)
-	float DestroyTime;
-	
 	UPROPERTY(EditAnywhere)
 	float DamageInnerRadius = 200.f;
 	

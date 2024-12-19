@@ -8,6 +8,12 @@
 #include "Blaster/Utils/DebugUtil.h"
 #include "Blaster/Weapon/Flag.h"
 
+ACaptureTheFlagGameMode::ACaptureTheFlagGameMode()
+{
+	bTeamMatch = true;
+	TeamWinningScore = 2;
+}
+
 // 保留玩家正常的击杀等逻辑, 但不影响团队得分
 void ACaptureTheFlagGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 	ABlasterPlayerController* VictimController,ABlasterPlayerController* AttackerController)
@@ -40,5 +46,9 @@ void ACaptureTheFlagGameMode::FlagCaptured(const AFlag* Flag, const AFlagZone* Z
 	{
 		BlasterGameState->TeamRedScores();
 		DebugUtil::PrintMsg(Flag, FString(TEXT("Team Red Score: %d"), BlasterGameState->GetRedTeamScore()));
+	}
+	if (ShouldEndGame())
+	{
+		EndMatch();
 	}
 }

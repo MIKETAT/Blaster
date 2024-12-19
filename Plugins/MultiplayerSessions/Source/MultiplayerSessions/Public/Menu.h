@@ -54,7 +54,7 @@ private:
 	UButton* JoinButton;
 
 	UPROPERTY(BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
-	int32 NumPublicConnections{4};
+	int32 NumPublicConnections{2};
 
 	UPROPERTY(BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FString MatchType{"FreeForAll"};

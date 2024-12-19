@@ -29,7 +29,6 @@
 void AProjectileWeapon::Fire(const FVector& HitTarget)
 {
 	Super::Fire(HitTarget);
-	DebugUtil::PrintMsg(TEXT("AProjectileWeapon Firing"));
 	
 	APawn* InstigatorPawn = Cast<APawn>(GetOwner());
 	// 获取枪口位置":

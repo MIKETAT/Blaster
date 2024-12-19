@@ -35,9 +35,8 @@ void APickupSpawnPoint::SpawnPickupTimerFinish()
 }
 
 void APickupSpawnPoint::Tick(float DeltaTime)
-{
+{		
 	Super::Tick(DeltaTime);
-
 }
 
 void APickupSpawnPoint::RandomSpawnPickup()

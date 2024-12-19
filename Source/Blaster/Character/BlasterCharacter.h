@@ -25,7 +25,6 @@ class BLASTER_API ABlasterCharacter : public ACharacter, public IInteractWithCro
 {
 	GENERATED_BODY()
 
-// Functions
 public:
 	ABlasterCharacter();
 	void ConstructHitBox();
@@ -80,7 +79,7 @@ public:
 	FORCEINLINE UBuffComponent* GetBuff() const { return Buff; }
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
 	FORCEINLINE bool IsHovering() const { return bHovering;}
-	FORCEINLINE bool IsHoldingTheFlag() const;
+	bool IsHoldingTheFlag() const;
 	FORCEINLINE class ULagCompensationComponent* GetLagCompensationComponent() const { return LagCompensation; }
 	bool IsLocallyReloading();
 	ECombatState GetCombatState() const;
@@ -234,7 +233,7 @@ private:
 	float AO_Yaw;
 	float InterpAO_Yaw;
 	float AO_Pitch;
-	FRotator StartingAnimRotation;
+	FRotator StartingAnimRotation;	// 上次运动时的Rotation
 
 	ETurningInPlace TurningInPlace;
 	
@@ -307,7 +306,7 @@ private:
 	FTimerHandle ElimTimer;
 	
 	UPROPERTY(EditDefaultsOnly)	// shouldn't have different elim timer
-	float ElimDelay = 3.f;
+	float ElimDelay = 10.f;
 
 	/**
 	*	Dissolve Effects 
@@ -353,7 +352,7 @@ private:
 	UParticleSystem* ElimBotEffect;
 	
 	UPROPERTY(VisibleAnywhere)
-	UParticleSystemComponent* ElimBotComponent;
+	UParticleSystemComponent* ElimBotEffectComponent;
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* ElimBotSound;

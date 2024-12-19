@@ -54,7 +54,7 @@ public:
 	void ServerCheckMatchState();
 
 	UFUNCTION(Client, Reliable)
-	void ClientJoinGame(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime);
+	void ClientJoinGame(FName state, float matchTime, float warmupTime, float coolDownTime, float levelStartTime, bool bTeamMatch);
 
 	virtual float GetServerTime();	// synced with server clock
 
@@ -72,15 +72,21 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 	void ShowReturnToMainMenu();
-
-	UPROPERTY(ReplicatedUsing = OnRep_bShowTeamScore)
-	bool bShowTeamScore = false;
-
+	
 	UFUNCTION(Server, Reliable)
 	void ServerReportPingStatus(bool bHighPing);
 	
 	UFUNCTION()
 	void OnRep_bShowTeamScore();
+	
+	UPROPERTY(EditAnywhere)
+	class USoundCue* LobbyMusic;
+
+	UPROPERTY()
+	UAudioComponent* LobbyMusicComp;
+	
+	UPROPERTY(ReplicatedUsing = OnRep_bShowTeamScore)
+	bool bShowTeamScore = false;
 private:
 	UPROPERTY()
 	class ABlasterHUD* BlasterHUD;

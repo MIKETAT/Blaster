@@ -66,7 +66,7 @@ public:
 	USniperScopeOverlayWidget* SniperScopeOverlayWidget;
 
 	UPROPERTY(EditAnywhere)
-	USoundCue* ZoomInSound;
+	class USoundCue* ZoomInSound;
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* ZoomOutSound;

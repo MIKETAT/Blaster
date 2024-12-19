@@ -37,7 +37,6 @@ void ABlasterPlayerState::DefeatsChange(int32 DefeatsAmount)
 
 void ABlasterPlayerState::SetTeam(ETeam TeamToSet)
 {
-	DebugUtil::PrintMsg(FString::Printf(TEXT("SetTeam")), FColor::Green);
 	Team = TeamToSet;
 	Character = Cast<ABlasterCharacter>(GetPawn());
 	if (Character)

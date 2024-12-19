@@ -64,11 +64,6 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 		FHitResult HitResult;
 		TraceUnderCrosshairs(HitResult);
 		HitTarget = HitResult.ImpactPoint;
-		DrawDebugPoint(
-			GetWorld(),
-			HitTarget,
-			15.f,
-			FColor::Purple);
 		InterpFOV(DeltaTime);
 		SetHUDCrosshairs(DeltaTime);
 	}
@@ -162,7 +157,6 @@ void UCombatComponent::OnRep_Grenades()
 // on client
 void UCombatComponent::OnRep_CombatState()
 {
-	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_CombatState")));
 	switch (CombatState)
 	{
 		case ECombatState::ECS_UnOccupied:
@@ -181,6 +175,7 @@ void UCombatComponent::OnRep_CombatState()
 		case ECombatState::ECS_ThrowingGrenade:
 			if (Character && !Character->IsLocallyControlled())
 			{
+				DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_CombatState ECS_ThrowingGrenade")));
 				Character->PlayThrowGrenadeMontage();
 				AttachActorToLeftHand(EquippedWeapon);
 				ShowGrenade(true);
@@ -212,7 +207,6 @@ void UCombatComponent::FireButtonPressed(bool bPressed)
 
 void UCombatComponent::Fire()
 {
-	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Combat Component Call Fire")));
 	// out of ammo
 	if (EquippedWeapon && EquippedWeapon->GetAmmo() == 0 && EquippedWeapon->OutOfAmmoSound)
 	{
@@ -226,7 +220,7 @@ void UCombatComponent::Fire()
 	EquippedWeapon->SetWeaponFireStatus(false);	// 开火执行时不能同时开火
 	switch (EquippedWeapon->FireType)
 	{
-	case EFireType::EFT_Projectile:
+		case EFireType::EFT_Projectile:
 			FireProjectileWeapon();
 			break;
 		case EFireType::EFT_HitScan:
@@ -244,8 +238,6 @@ void UCombatComponent::Fire()
 
 void UCombatComponent::LocalFire(const FVector_NetQuantize& TraceHitTarget)
 {
-	DebugUtil::PrintMsg(Character, TEXT("Call Local Fire"));
-	
 	if (EquippedWeapon == nullptr)	return;
 	if (Character && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
 	{
@@ -413,13 +405,10 @@ int32 UCombatComponent::AmountToReload()
 {
 	if (Character == nullptr || EquippedWeapon == nullptr)	return 0;
 	int32 RoomForReload = EquippedWeapon->GetMaxCapacity() - EquippedWeapon->GetAmmo();
-	//DebugUtil::PrintMsg(FString::Printf(TEXT("RoomForReload is %d"), RoomForReload), FColor::Red);
-	//DebugUtil::LogMsg(FString::Printf(TEXT("RoomForReload is %d"), RoomForReload));
 	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
 	{
 		int32 CarriedWeaponAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
 		int32 Least = FMath::Min(CarriedWeaponAmmo, RoomForReload);
-	//	UE_LOG(LogTemp, Error, TEXT("CarriedWeaponAmmo = %d  Least = %d"), CarriedWeaponAmmo, Least);
 		return FMath::Clamp(RoomForReload, 0, Least);	
 	}
 	return 0;
@@ -428,7 +417,6 @@ int32 UCombatComponent::AmountToReload()
 void UCombatComponent::Reload()
 {
 	if (EquippedWeapon == nullptr || EquippedWeapon->IsFull())	return;
-	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Call Reload")));
 	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_UnOccupied && !bLocallyReloading)
 	{
 		ServerReload();
@@ -450,7 +438,6 @@ void UCombatComponent::ServerReload_Implementation()
 // todo reload的动画需要改，只上半身reload，不影响下半身，不会改变状态(蹲下->站起)这种
 void UCombatComponent::HandleReload()
 {
-	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Call HandleReload")));
 	CombatState = ECombatState::ECS_Reloading;
 	if (Character)
 	{
@@ -460,8 +447,6 @@ void UCombatComponent::HandleReload()
 
 void UCombatComponent::FinishReloading()
 {
-	FString Name = Character ? Character->GetName() : "No Name";
-	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Call FinishReloading, %s Reload"), *Name));
 	if (Character == nullptr)	return;
 	bLocallyReloading = false;
 	// 重要变量的变化，例如状态的变化都在server执行
@@ -525,7 +510,11 @@ void UCombatComponent::FinishSwapAttachWeapons()
 	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
 
 	AutoReloadEmptyWeapon();
-	UpdateAmmoHUD();
+	if (Character->IsLocallyControlled() && HUD)
+	{
+		HUD->SetHUDCrosshairEnabled(EquippedWeapon != nullptr);
+		UpdateAmmoHUD();
+	}
 	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("FinishSwapAttachWeapons")));
 	DebugUtil::PrintMsg(Character, FString("Now First Weapon is " + EquippedWeapon->GetName()));
 	DebugUtil::PrintMsg(Character, FString("Now Second Weapon is " + SecondaryWeapon->GetName()));
@@ -533,17 +522,16 @@ void UCombatComponent::FinishSwapAttachWeapons()
 
 void UCombatComponent::ThrowGrenade()
 {
-	if (Grenades == 0)	return;	// todo if on clinet, what if client is cheating 
+	if (Grenades == 0)	return;
 	
-	// todo 没有武器时是否可以扔雷
-	if (CombatState != ECombatState::ECS_UnOccupied || !Character)	return;
+	if (CombatState != ECombatState::ECS_UnOccupied || !Character || !EquippedWeapon)	return;
 
 	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("ThrowGrenade")));
-	
+
 	CombatState = ECombatState::ECS_ThrowingGrenade;
-	Character->PlayThrowGrenadeMontage();
 	AttachActorToLeftHand(EquippedWeapon);
 	ShowGrenade(true);
+	Character->PlayThrowGrenadeMontage();
 	if (Character->HasAuthority())
 	{
 		Grenades = FMath::Clamp(Grenades - 1, 0, MaxGrenades);
@@ -567,11 +555,12 @@ void UCombatComponent::ServerThrowGrenade_Implementation()
 {
 	if (Grenades == 0)	return;
 
-	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("ThrowGrenadeServerThrowGrenade_Implementation")));
+	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("ServerThrowGrenade_Implementation")));
 	
 	CombatState = ECombatState::ECS_ThrowingGrenade;
 	if (Character)
 	{
+		DebugUtil::PrintMsg(Character, FString::Printf(TEXT("Call Play Montage ServerThrowGrenade_Implementation")));
 		Character->PlayThrowGrenadeMontage();
 		AttachActorToLeftHand(EquippedWeapon); // save?
 		ShowGrenade(true);
@@ -623,7 +612,6 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		CrosshairWorldPosition, CrosshairWorldDirection);
 	if (bScreenToWorld)
 	{
-		// performin g linetrace
 		FVector Start = CrosshairWorldPosition;
 		// linetrace should begin in front of character, avoid shooting behind the character
 		float CameraDistance = (Start - Character->GetActorLocation()).Size();
@@ -647,10 +635,10 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		{
 			TraceHitResult.ImpactPoint = End;
 		}
-		if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairsInterface>() && TraceHitResult.GetActor() != this->Character)
+		if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairsInterface>()
+			&& TraceHitResult.GetActor() != Character)
 		{
 			DrawDebugPoint(GetWorld(), TraceHitResult.ImpactPoint, 5.f, FColor::Orange);
-			// crosshair hit character, change hud color to red
 			HUDPackage.CrosshairsColor = FLinearColor::Red;
 		} else
 		{
@@ -711,14 +699,14 @@ void UCombatComponent::OnRep_EquippedWeapon(AWeapon* LastWeapon)	// todo LastWea
 	if (EquippedWeapon)
 	{
 		// test
-		if (EquippedWeapon != LastWeapon)
+		/*if (EquippedWeapon != LastWeapon)
 		{
 			DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_EquippedWeapon EquippedWeapon != LastWeapon")));
 		}
 		if (LastWeapon)
 		{
 			DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_EquippedWeapon  LastWeapon: %s"), *LastWeapon->GetWeaponName().ToString()));
-		}
+		}*/
 		// TODO 为什么下面这段不加上，client依然可以执行捡起武器。
 		EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 		AttachActorToRightHand(EquippedWeapon);
@@ -732,10 +720,7 @@ void UCombatComponent::OnRep_EquippedWeapon(AWeapon* LastWeapon)	// todo LastWea
 			Controller->SetHUDAmmo(EquippedWeapon->GetAmmo(), CarriedAmmo);
 		}
 		PlayEquipWeaponSound(EquippedWeapon);
-		DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_EquippedWeapon: %s"), *EquippedWeapon->GetWeaponName().ToString()));
-	} else
-	{
-		DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_EquippedWeapon is null")));
+		//DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_EquippedWeapon: %s"), *EquippedWeapon->GetWeaponName().ToString()));
 	}
 	if (Character->IsLocallyControlled() && HUD)
 	{
@@ -795,7 +780,7 @@ void UCombatComponent::SpawnDefaultWeapon()
 	{
 		DefaultWeapon->SetIsDefaultWeapon(true);
 	}
-	DebugUtil::PrintMsg(Character, TEXT("SpawnDefaultWeapon"));
+	//DebugUtil::PrintMsg(Character, TEXT("SpawnDefaultWeapon"));
 }
 
 void UCombatComponent::DropEquippedWeapon()
@@ -805,7 +790,11 @@ void UCombatComponent::DropEquippedWeapon()
 		EquippedWeapon->Drop();	// 已有武器则扔掉替换
 		EquippedWeapon = nullptr;
 	}
-	UpdateAmmoHUD();
+	if (Character->IsLocallyControlled() && HUD)
+	{
+		HUD->SetHUDCrosshairEnabled(EquippedWeapon != nullptr);
+		UpdateAmmoHUD();
+	}
 }
 
 void UCombatComponent::DropOrDestroyWeapon(AWeapon* WeaponToHandle)
@@ -831,7 +820,7 @@ void UCombatComponent::AttachActorToRightHand(AActor* ActorToAttach)
 	}
 }
 
-// todo: pistol submachinegun 的socket需要单独调整	p151-22:00
+
 void UCombatComponent::AttachActorToLeftHand(AActor* ActorToAttach)
 {
 	if (Character == nullptr || Character->GetMesh() == nullptr || ActorToAttach == nullptr)	return;
@@ -930,7 +919,11 @@ void UCombatComponent::DropWeapon()
 	}
 	EquippedWeapon->Drop();
 	EquippedWeapon = nullptr;
-	UpdateAmmoHUD();
+	if (Character->IsLocallyControlled() && HUD)
+	{
+		HUD->SetHUDCrosshairEnabled(EquippedWeapon != nullptr);
+		UpdateAmmoHUD();
+	}
 }
 
 void UCombatComponent::EquipPrimitiveWeapon(AWeapon* WeaponToEquip)
@@ -953,8 +946,12 @@ void UCombatComponent::EquipPrimitiveWeapon(AWeapon* WeaponToEquip)
 	}
 	PlayEquipWeaponSound(EquippedWeapon);
 	AutoReloadEmptyWeapon();
-	UpdateAmmoHUD();
-	DebugUtil::PrintMsg(Character, TEXT("Equip Primitive Weapon"));
+	if (Character->IsLocallyControlled() && HUD)
+	{
+		HUD->SetHUDCrosshairEnabled(EquippedWeapon != nullptr);
+		UpdateAmmoHUD();
+	}
+	//DebugUtil::PrintMsg(Character, TEXT("Equip Primitive Weapon"));
 }
 
 void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
@@ -971,7 +968,7 @@ void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
 		SecondaryWeapon->GetWeaponMesh()->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);
 		SecondaryWeapon->GetWeaponMesh()->MarkRenderStateDirty();	// todo 研究一下
 	}
-	DebugUtil::PrintMsg(Character, TEXT("Equip Secondary Weapon"));
+	//DebugUtil::PrintMsg(Character, TEXT("Equip Secondary Weapon"));
 }
 
 void UCombatComponent::DropCurrentWeaponAndEquipAnotherOne(AWeapon* WeaponToEquip)
@@ -1009,15 +1006,18 @@ void UCombatComponent::PutSecondaryWeapon()
 	EquippedWeapon->Drop();
 	EquipSecondaryWeapon(TempWeapon);
 	EquippedWeapon = nullptr;
+	if (Character->IsLocallyControlled() && HUD)
+	{
+		HUD->SetHUDCrosshairEnabled(EquippedWeapon != nullptr);
+		UpdateAmmoHUD();
+	}
 }
 
 bool UCombatComponent::CanFire() const
 {
 	// 无武器 || 武器无法开火(此刻不能开火/没子弹) || 当前状态不能开火
-	if (EquippedWeapon == nullptr || !EquippedWeapon->CanFire())
+	if (EquippedWeapon == nullptr || !EquippedWeapon->CanShoot())
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Black,
-			FString::Printf(TEXT("EquippedWeapon is %d  and EquippedWeapon->CanFire is %d"), EquippedWeapon == nullptr, EquippedWeapon->CanFire()));
 		return false;
 	}
 	// shotgun在换弹时也可开火
@@ -1057,7 +1057,6 @@ void UCombatComponent::LaunchGrenade()
 	ShowGrenade(false);
 	FString Name = Character ? Character->GetName() : "No Name";
 	DebugUtil::PrintMsg(Character, FString::Printf(TEXT("LaunchGrenade Name is %s"), *Name));
-	
 	if (Character && Character->IsLocallyControlled())
 	{
 		ServerLaunchGrenade(HitTarget);
@@ -1115,8 +1114,10 @@ void UCombatComponent::ServerLaunchGrenade_Implementation(const FVector_NetQuant
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.Owner = Character;
 		SpawnParameters.Instigator = Character;
+		
 		if (GetWorld())
 		{
+			DebugUtil::PrintMsg(FString::Printf(TEXT("Server Spawn Grenade Location is %s"), *LaunchLoaction.ToString()));
 			GetWorld()->SpawnActor<AProjectile>(
 				GrenadeClass,
 				LaunchLoaction,

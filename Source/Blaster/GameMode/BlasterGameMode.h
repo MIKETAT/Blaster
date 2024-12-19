@@ -29,6 +29,8 @@ public:
 
 	void PlayerLeftGame(ABlasterPlayerState* LeavingPlayerState);
 
+	FORCEINLINE bool IsTeamMatch() const { return bTeamMatch; }
+
 	UPROPERTY(EditDefaultsOnly)
 	float WarmupTime = 10.f;
 
@@ -45,14 +47,9 @@ protected:
 	virtual void HandleMatchCoolDown();
 	virtual bool ShouldEndGame();
 	virtual void EndMatch() override;
-	
-	UPROPERTY(EditAnywhere)
-	USoundCue* LobbyMusic;
-
-	UPROPERTY()
-	UAudioComponent* LobbyMusicComp;
 
 	// 是否为团队游戏: 夺旗/团队竞赛
+	UPROPERTY(EditAnywhere)
 	bool bTeamMatch = false;
 
 	// if it's a team match, when one team's score reaches FullScore then this team win

@@ -71,23 +71,22 @@ void ABlasterGameMode::OnMatchStateSet()
 	} else if (MatchState == MatchState::WaitingToStart)
 	{
 		bHasWinner = false;
-		if (LobbyMusic)
-		{
-			LobbyMusicComp = UGameplayStatics::SpawnSound2D(this, LobbyMusic);	
-		}
+
 	} else if (MatchState == MatchState::InProgress)
 	{
-		if (LobbyMusicComp)
-		{
-			LobbyMusicComp->Stop();
-		}
+		
 	}
-	for (FConstPlayerControllerIterator it = GetWorld()->GetPlayerControllerIterator(); it; it++)
+	FString CurrentMap = GetWorld()->GetCurrentLevel()->GetPathName();
+	DebugUtil::PrintMsg(FString::Printf(TEXT("On Server, Current Map is %s, MatchState is %s, And Current Controller Num is %d"), *CurrentMap, *MatchState.ToString(), GetWorld()->GetNumPlayerControllers()));
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; It++)
 	{
-		ABlasterPlayerController* BPlayerController = Cast<ABlasterPlayerController>(*it);
+		ABlasterPlayerController* BPlayerController = Cast<ABlasterPlayerController>(*It);
 		if (BPlayerController)
 		{
 			BPlayerController->SetMatchState(MatchState, bTeamMatch);
+			FString Text = FString::Printf(TEXT("Server PlayerController->SetMatchState. SetMatchState to %s, teamMatch is %hs, PlayerController Name is %s"),
+					*MatchState.ToString(), bTeamMatch ? "true" : "false", *this->GetName());
+			DebugUtil::PrintMsg(this, Text);
 		}
 	}
 }
@@ -196,9 +195,9 @@ void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 			BlasterPlayerController->BroadcastElim(AttackerState->GetName(), VictimState->GetName());
 		}
 	}
-	if (BlasterGameState && ShouldEndGame())
+	// 不是TeamMatch直接在这里判断游戏是否结束
+	if (!bTeamMatch && ShouldEndGame())		
 	{
-		//RestartGame();	// todo Announce  这个条件 FullScore应该放在GameState里吗
 		EndMatch();
 	}
 }

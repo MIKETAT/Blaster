@@ -3,7 +3,6 @@
 
 #include "BlasterAnimInstance.h"
 
-#include "AssetTypeCategories.h"
 #include "BlasterCharacter.h"
 #include "DrawDebugHelpers.h"
 #include "Blaster/BlasterTypes/CombatState.h"
@@ -26,10 +25,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	{
 		BlasterCharacter = Cast<ABlasterCharacter>(TryGetPawnOwner());
 	}
-	if (BlasterCharacter == nullptr)
-	{
-		return;
-	}
+	if (BlasterCharacter == nullptr)	return;
 	
 	FVector Velocity = BlasterCharacter->GetVelocity();
 	Velocity.Z = 0.f;
@@ -45,6 +41,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsAiming = BlasterCharacter->isAiming();
 	bElimmed = BlasterCharacter->IsElimmed();
 	bHoldingTheFlag = BlasterCharacter->IsHoldingTheFlag();
+
 	bUseFABRIK = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
 	bool bShouldUseFABRIK = BlasterCharacter->IsLocallyControlled()
 		&& BlasterCharacter->GetCombatState() != ECombatState::ECS_ThrowingGrenade
@@ -58,11 +55,10 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bUseTransformRightHand = BlasterCharacter->GetCombatState() == ECombatState::ECS_UnOccupied;
 	TurningInPlace = BlasterCharacter->GetTurningInPlace();
 
-	// GlobalRotation 是controller相对世界的rotation
+	// 人物移动和鼠标瞄准的夹角
 	FRotator AimRotation = BlasterCharacter->GetBaseAimRotation();	// BaseAimRotation already replicated
 	FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(BlasterCharacter->GetVelocity());
 	// Yaw Offset for Strafing
-	//YawOffset = UKismetMathLibrary::NormalizedDeltaRotator(MovementRotation, AimRotation).Yaw;
 	FRotator DeltaRot = UKismetMathLibrary::NormalizedDeltaRotator(MovementRotation, AimRotation);
 	DeltaRotation = FMath::RInterpTo(DeltaRotation, DeltaRot, DeltaSeconds, 6.f);
 	YawOffset = DeltaRotation.Yaw;
@@ -85,6 +81,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		LeftHandTrasnform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket"), ERelativeTransformSpace::RTS_World);
 		FVector OutPosition;
 		FRotator OutRotation;
+		// world space -> bone space, this is our target
 		BlasterCharacter->GetMesh()->TransformToBoneSpace(FName("Hand_R"), LeftHandTrasnform.GetLocation(),
 			FRotator::ZeroRotator, OutPosition, OutRotation);
 		LeftHandTrasnform.SetLocation(OutPosition);
@@ -94,7 +91,7 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		{
 			bLocallyControlled = true;
 			FTransform RightHandTransform = BlasterCharacter->GetMesh()->GetSocketTransform(FName("hand_r"), ERelativeTransformSpace::RTS_World);
-			DrawDebugPoint(GetWorld(), RightHandTransform.GetLocation(), 10.f, FColor::Yellow);
+			
 			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(
 				RightHandTransform.GetLocation(),
 				RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - BlasterCharacter->GetHitTarget()));

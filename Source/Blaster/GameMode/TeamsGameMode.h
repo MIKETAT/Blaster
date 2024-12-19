@@ -6,9 +6,6 @@
 #include "BlasterGameMode.h"
 #include "TeamsGameMode.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class BLASTER_API ATeamsGameMode : public ABlasterGameMode
 {
@@ -24,4 +21,8 @@ public:
 	virtual float CalculateDamage(AController* AttackerController, AController* VictimController, float BaseDamage) override;
 protected:
 	virtual void HandleMatchHasStarted() override;
+	virtual bool ShouldEndGame() override;
+
+	UPROPERTY(EditAnywhere)
+	int32 TeamWinningScore = 6;
 };

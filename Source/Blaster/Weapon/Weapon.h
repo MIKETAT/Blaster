@@ -48,7 +48,8 @@ public:
 	FORCEINLINE float GetZoomedFOV() const { return ZoomedFOV; }
 	FORCEINLINE float GetZoomInterpSpeed() const { return ZoomInterSpeed; }
 	FORCEINLINE bool CanAutomaticFire() const { return bAutomaticFire; }
-	FORCEINLINE bool CanFire() const{ return bCanFire && Ammo > 0; }	// 这里我CanFire变量设置为Weapon的成员，感觉更合理
+	FORCEINLINE bool CanShoot() const{ return bCanFire && Ammo > 0; }	// 这里我CanFire变量设置为Weapon的成员，感觉更合理
+	FORCEINLINE bool CanFire() const { return bCanFire; } 
 	FORCEINLINE float GetFireDelay() const { return FireDelay; }
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE bool IsEmpty() const { return Ammo == 0; }
@@ -155,7 +156,7 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_WeaponState, VisibleAnywhere, Category = "Weapon Properties")
 	EWeaponState WeaponState;
 
-	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon Properties")
 	class UWidgetComponent* PickUpWidget;
 	
 	FTimerHandle FireTimer;
@@ -230,7 +231,7 @@ public:
 	UTexture2D* CrosshairBottom;
 
 	UPROPERTY(EditAnywhere)
-	USoundCue* EquipSound;
+	class USoundCue* EquipSound;
 
 	UPROPERTY(EditAnywhere)
 	USoundCue* OutOfAmmoSound;

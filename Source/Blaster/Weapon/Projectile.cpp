@@ -5,6 +5,7 @@
 
 #include "NiagaraFunctionLibrary.h"
 #include "Blaster/Blaster.h"
+#include "Blaster/Utils/DebugUtil.h"
 #include "Components/BoxComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -23,7 +24,6 @@ AProjectile::AProjectile()
 	CollisionBox->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECR_Block);
 	CollisionBox->SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldStatic, ECR_Block);
 	CollisionBox->SetCollisionResponseToChannel(ECC_SkeletalMesh, ECR_Block);
-
 }
 
 void AProjectile::BeginPlay()
@@ -43,7 +43,7 @@ void AProjectile::BeginPlay()
 	// server端才执行 hitEvent
 	if (HasAuthority())
 	{
-		CollisionBox->OnComponentHit.AddDynamic(this, &AProjectile::OnHit);	// todo 研究一下
+		CollisionBox->OnComponentHit.AddDynamic(this, &AProjectile::OnHit);
 	}
 
 	/*
@@ -78,6 +78,7 @@ void AProjectile::StartDestroyTimer()
 
 void AProjectile::DestroyTimerFinish()
 {
+	DebugUtil::PrintMsg(this, FString::Printf(TEXT("AProjectile::DestroyTimerFinish")));
 	Destroy();
 }
 
@@ -124,7 +125,7 @@ void AProjectile::ExplodeDamage()
 void AProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
                         FVector NormalImpluse, const FHitResult& Hit)
 {
-	Destroyed();	// destroy a replicated actor will propagate ot all clients 
+	Destroy();	// destroy a replicated actor will propagate ot all clients 
 }
 
 void AProjectile::Tick(float DeltaTime)
@@ -145,7 +146,6 @@ void AProjectile::Destroyed()
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, GetActorLocation());
 	}
-	//ProjectileMesh->DestroyComponent();
 }
 
 #if WITH_EDITOR
