@@ -71,7 +71,6 @@ void ABlasterGameMode::OnMatchStateSet()
 	} else if (MatchState == MatchState::WaitingToStart)
 	{
 		bHasWinner = false;
-
 	} else if (MatchState == MatchState::InProgress)
 	{
 		
@@ -97,8 +96,7 @@ void ABlasterGameMode::HandleMatchCoolDown()
 	// wait cooldown time ends
 }
 
-
-
+// TeamMatch模式下无队友伤害, 重写此函数根据是否是同一队计算伤害
 float ABlasterGameMode::CalculateDamage(AController* AttackerController, AController* VictimController, float BaseDamage)
 {
 	DebugUtil::PrintMsg(FString("BlasterGameMode, Calculate Damage"), FColor::Red);
@@ -139,28 +137,27 @@ void ABlasterGameMode::EndMatch()
 }
 
 void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
-                                        ABlasterPlayerController* VictimController, ABlasterPlayerController* AttackerController)
+	ABlasterPlayerController* VictimController, ABlasterPlayerController* AttackerController)
 {
 	// Add Socore to Attacker
 	ABlasterPlayerState* AttackerState = AttackerController ? Cast<ABlasterPlayerState>(AttackerController->PlayerState) : nullptr;
 	ABlasterPlayerState* VictimState = AttackerController ? Cast<ABlasterPlayerState>(VictimController->PlayerState) : nullptr;
 	ABlasterGameState* BlasterGameState = Cast<ABlasterGameState>(UGameplayStatics::GetGameState(this));
+	// Score 相关
 	if (AttackerState && VictimState && BlasterGameState && AttackerState != VictimState)
 	{
 		AttackerState->AddToScore(1.f);
 		VictimState->AddToDefeats(1.f);
-		// todo: 如何拷贝一个已有的TArray,类似STL的拷贝构造
 		TArray<ABlasterPlayerState*> CurrentTopPlayer;
 		for (auto it : BlasterGameState->TopScorePlayer)
 		{
 			CurrentTopPlayer.Emplace(it);
 		}
 		BlasterGameState->UpdateTopScorePlayer(AttackerState);
-		// Gain The Lead
+		// All Top Player Gain The Lead
 		for (auto it : BlasterGameState->TopScorePlayer)
 		{
-			ABlasterCharacter* Leader = Cast<ABlasterCharacter>(it->GetPawn());
-			if (Leader)
+			if (ABlasterCharacter* Leader = Cast<ABlasterCharacter>(it->GetPawn()))
 			{
 				Leader->MulticastGainTheLead();
 			}
@@ -171,8 +168,8 @@ void ABlasterGameMode::PlayerEliminated(ABlasterCharacter* EliminatedCharacter,
 		{
 			if (!BlasterGameState->TopScorePlayer.Contains(CurrentTopPlayer[i]))
 			{
-				ABlasterCharacter* Loser = Cast<ABlasterCharacter>(CurrentTopPlayer[i]->GetPawn());
-				if (Loser)
+				// Update后, 之前的TopPlayer现在如果不再是TopPlayer, LOST THE LEAD
+				if (ABlasterCharacter* Loser = Cast<ABlasterCharacter>(CurrentTopPlayer[i]->GetPawn()))
 				{
 					Loser->MulticastLostTheLead();
 				}

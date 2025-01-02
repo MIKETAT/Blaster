@@ -45,7 +45,6 @@ public:
 	// Play Montages
 	void PlayFireMontage(bool bAiming);
 	void PlayReloadMontage();
-	void PlayHoverMontage();
 	void PlayHitReactMontage();
 	void PlayElimMontage();
 	void PlayThrowGrenadeMontage();
@@ -55,9 +54,6 @@ public:
 	FORCEINLINE AWeapon* GetOverlappingWeapon() const { return OverlappingWeapon; }
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
-	/* 由于Health已经是Replicated的(改变会自动调用OnRep_Health, 利用这点比发rpc更节省资源)
-	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastHit();*/
 	FORCEINLINE ABlasterPlayerController* GetBlasterPlayerController() const
 	{
 		return BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
@@ -78,7 +74,6 @@ public:
 	FORCEINLINE UCombatComponent* GetCombat() const { return BlasterCombatComp; }
 	FORCEINLINE UBuffComponent* GetBuff() const { return Buff; }
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
-	FORCEINLINE bool IsHovering() const { return bHovering;}
 	bool IsHoldingTheFlag() const;
 	FORCEINLINE class ULagCompensationComponent* GetLagCompensationComponent() const { return LagCompensation; }
 	bool IsLocallyReloading();
@@ -90,38 +85,39 @@ public:
 	void UpdateShieldHUD();
 	void DropOrDestroyWeapons();
 
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastElim(bool bPlayerLeftGame);
-
 	// Only on Server
 	void Elim(bool bPlayerLeftGame);
-	void SetSpawnPoint();
-	void OnPlayerStateInitialized();
-
-
-	void SetTeamColor(ETeam TeamToSet);
 	
-	// 处理初始化相关的逻辑，
-	void PollInit();
-
-	//UFUNCTION(BlueprintImplementableEvent)
-	//void ShowSniperScopeWidget(bool bShowScope);
-
-	UFUNCTION(Server, Reliable)
-	void ServerLeaveGame();
-
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastElim(bool bPlayerLeftGame);
+	
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastGainTheLead();
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastLostTheLead();
+	
+	// 处理初始化相关的逻辑，
+	void PollInit();
+	void OnPlayerStateInitialized();
+	void SetSpawnPoint();
+	void SetTeamColor(ETeam TeamToSet);
+	
 
+	//UFUNCTION(BlueprintImplementableEvent)
+	//void ShowSniperScopeWidget(bool bShowScope);
+
+	// Press Quit Button
+	UFUNCTION(Server, Reliable)
+	void ServerLeaveGame();
+	
 	FOnLeftGame OnLeftGame;
 	
 	UPROPERTY()
 	TMap<FName, class UBoxComponent*> HitCollisionBoxes;
 
 	bool bFinishSwapping = true;
+	
 protected:
 	virtual void BeginPlay() override;
 	void RotateInPlace(float DeltaTime);
@@ -129,24 +125,29 @@ protected:
 	void MoveRight(float Value);
 	void Turn(float Value);
 	void LookUp(float Value);
-	void HoverButtonPressed();
+	virtual void Jump() override;
+	void CrouchButtonPressed();
+
+	void CameraButtonPressed();
+	void CameraButtonReleased();
+	
+	// 下面的功能都转发到CombatComponent中执行
 	void EquipButtonPressed();
 	void DropButtonPressed();
-	void CrouchButtonPressed();
+	void FireButtonPressed();
+	void FireButtonReleased();
 	void AimButtonPressed();
 	void AimButtonReleased();
 	void ReloadButtonPressed();
 	void GrenadeButtonPressed();
+
+	// 
 	void CalculateAO_Pitch();
 	void AimOffset(float DeltaTime);
 	void SimProxiesTurn();
 	void TurnInPlace(float DeltaTime);
-	virtual void Jump() override;
-	void FireButtonPressed();
-	void FireButtonReleased();
-	// tood damage delegates in unreal
-	// we can bind function which has signature below to delegate function like onTakenAnyDamage
-	UFUNCTION()			// todo find out why it has to be UFUNCTION()
+
+	UFUNCTION()
 	void ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser);
 private:
 	UPROPERTY(VisibleAnywhere, Category = Camera)
@@ -226,19 +227,17 @@ private:
 
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 	class ULagCompensationComponent* LagCompensation;
-	
-	UPROPERTY(ReplicatedUsing = OnRep_bHovering)
-	bool bHovering = false;
-	
+
 	float AO_Yaw;
-	float InterpAO_Yaw;
 	float AO_Pitch;
+	float InterpAO_Yaw;
+	
 	FRotator StartingAnimRotation;	// 上次运动时的Rotation
 
 	ETurningInPlace TurningInPlace;
 	
 	UPROPERTY(EditAnywhere)
-	float CameraThreshold = 200.f;
+	float CameraThreshold = 200.f;	// 距离墙体太近则隐藏Character
 
 	/**
 	 * Montages
@@ -251,9 +250,6 @@ private:
 	
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* ElimMontage;
-
-	UPROPERTY(EditAnywhere, Category= Combat)
-	UAnimMontage* HoverMontage;
 	
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* ReloadMontage;
@@ -263,7 +259,6 @@ private:
 
 	UPROPERTY(EditAnywhere, Category= Combat)
 	UAnimMontage* SwapMontage;
-
 	
 	bool bRotateRootBone;
 	// 超过这个阈值，在SimProxy执行turn animation
@@ -286,7 +281,6 @@ private:
 	/**
 	 * Player Shield
 	 */
-
 	UPROPERTY(EditAnywhere, Category = "Player Status0")
 	float MaxShield = 100.f;
 
@@ -298,10 +292,10 @@ private:
 	bool bLeftGame = false;
 
 	UPROPERTY()
-	ABlasterPlayerController* BlasterPlayerController;
+	ABlasterPlayerController* BlasterPlayerController;	// 避免每次都cast
 
 	UPROPERTY()
-	ABlasterGameMode* BlasterGameMode;
+	ABlasterGameMode* BlasterGameMode;	// 避免每次都cast
 	
 	FTimerHandle ElimTimer;
 	
@@ -336,6 +330,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = Elim)
 	UMaterialInstance* BlueDissolveMatInst;
 
+	// Color
 	UPROPERTY(EditAnywhere, Category = Elim)
 	UMaterialInstance* RedMaterial;
 
@@ -366,9 +361,7 @@ private:
 	UPROPERTY()
 	ABlasterPlayerState* BlasterPlayerState;
 	
-	/**
-	 * Grenade
-	 */
+	//Grenade 
 	UPROPERTY(VisibleAnywhere)
 	UStaticMeshComponent* AttachedGrenade;
 	
@@ -378,9 +371,6 @@ private:
 	void StartDissolve();
 	
 	void ElimTimerFinish();
-
-	UFUNCTION()
-	void OnRep_bHovering();
 	
 	UFUNCTION()
 	void OnRep_Health(float LastHealth);
@@ -398,9 +388,6 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerDropButtonPressed();
-
-	UFUNCTION(Server, Reliable)
-	void ServerHoverButtonPressed();
 
 	void SetCharacterVisibility(bool bHide);
 

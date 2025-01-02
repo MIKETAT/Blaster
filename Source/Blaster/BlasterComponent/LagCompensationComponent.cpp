@@ -51,10 +51,6 @@ void ULagCompensationComponent::MoveToPosition(ABlasterCharacter* HitCharacter, 
 	for (auto& Pair : HitCharacter->HitCollisionBoxes)
 	{
 		FName Name = Pair.Key;
-		if (Pair.Value)
-		{
-			DebugUtil::PrintMsg(TEXT("Pair.Value is null"));
-		}
 		Pair.Value->SetWorldLocation(Position.HitBoxInfo[Name].Location);
 		Pair.Value->SetWorldRotation(Position.HitBoxInfo[Name].Rotation);
 		Pair.Value->SetBoxExtent(Position.HitBoxInfo[Name].BoxExtent);
@@ -62,14 +58,14 @@ void ULagCompensationComponent::MoveToPosition(ABlasterCharacter* HitCharacter, 
 		{
 			Pair.Value->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
-		UBoxComponent* HitBox = Pair.Value;
+		/*UBoxComponent* HitBox = Pair.Value;
 		DrawDebugBox(GetWorld(),
 					HitBox->GetComponentLocation(),
 					HitBox->GetScaledBoxExtent(),
 					FQuat(HitBox->GetComponentRotation()),
 					FColor::Orange,
 					false,
-					8.f);
+					8.f);*/
 	}
 }
 
@@ -110,6 +106,7 @@ FServerSideRewindResult ULagCompensationComponent::ConfirmRewindResult(const FFr
 	if (ABlasterCharacter* HitCharacter = Cast<ABlasterCharacter>(ConfirmHit.GetActor()))	// headshot
 	{
 		ResetPositionAndCollision(CheckFrame.BlasterCharacter, CurrentFrame);
+		ShowFramePackage(CheckFrame, FColor::Red);
 		return FServerSideRewindResult{true, true};
 	}
 	// no headshot
@@ -194,6 +191,19 @@ void ULagCompensationComponent::ShowFramePackage(const FFramePackage& Package, c
 			false,
 			MaxRecordTime);
 	}
+}
+
+void ULagCompensationComponent::ShowHitBox(const FFramePackage& Package, const FName& BoneName, const FColor& Color)
+{
+	if (!Package.HitBoxInfo.Contains(BoneName))		return;
+	const FBoxInfo& HitBox = Package.HitBoxInfo[BoneName];
+	DrawDebugBox(GetWorld(),
+			HitBox.Location,
+			HitBox.BoxExtent,
+			FQuat(HitBox.Rotation),
+			Color,
+			false,
+			MaxRecordTime);
 }
 
 FFramePackage ULagCompensationComponent::GetCheckFrame(ABlasterCharacter* HitCharacter, const float HitTime)

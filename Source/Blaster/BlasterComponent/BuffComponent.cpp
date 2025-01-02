@@ -75,8 +75,7 @@ void UBuffComponent::BuffJump(float JumpVelocity, float BuffTime)
 	Character->GetWorldTimerManager().SetTimer(
 		JumpBuffTimer,
 		this,
-		&UBuffComponent::ResetJumpVelocity
-		,
+		&UBuffComponent::ResetJumpVelocity,
 		BuffTime);
 	if (Character->GetCharacterMovement())
 	{

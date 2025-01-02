@@ -512,6 +512,7 @@ void ABlasterPlayerController::HandleMatchCoolDown()
 {
 	DebugUtil::PrintMsg(this, FString::Printf(TEXT("ABlasterPlayerController::HandleMatchCoolDown")));
 	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
+	DisableInput(this);
 	if (BlasterHUD)
 	{
 		if (BlasterHUD->CharacterOverlay)	BlasterHUD->CharacterOverlay->RemoveFromParent();

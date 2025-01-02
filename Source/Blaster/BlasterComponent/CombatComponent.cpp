@@ -119,7 +119,9 @@ void UCombatComponent::OnRep_bIsAiming()
 {
 	if (Character && Character->IsLocallyControlled())
 	{
-		bIsAiming = bAimingButtonPressed;	// client本地是否isAim取决于当前AimButtonPressed是否为true,避免lag时同步导致的本地not pressed, 但是同步过来是Pressed状态
+		// client本地是否isAim取决于当前AimButtonPressed是否为true,避免lag时同步导致的本地not pressed, 但是同步过来是Pressed状态
+		// 也就是说不根据server 同步过来的值
+		bIsAiming = bAimingButtonPressed;	
 	}
 }
 
@@ -157,22 +159,26 @@ void UCombatComponent::OnRep_Grenades()
 // on client
 void UCombatComponent::OnRep_CombatState()
 {
+	DebugUtil::PrintMsg(GetOwner(), FString::Printf(TEXT("OnRep_CombatState")));
 	switch (CombatState)
 	{
 		case ECombatState::ECS_UnOccupied:
 			// 切回到UnOccupied，此时开火键按住的话就开火
+			DebugUtil::PrintMsg(GetOwner(), FString::Printf(TEXT("OnRep_CombatState ECS_UnOccupied")));
 			if (bFireButtonPressed)
 			{
 				Fire();
 			}
 			break;
 		case ECombatState::ECS_Reloading:
+			DebugUtil::PrintMsg(GetOwner(), FString::Printf(TEXT("OnRep_CombatState ECS_Reloading")));
 			if (Character && !Character->IsLocallyControlled())
 			{
 				HandleReload();
 			}
 			break;
 		case ECombatState::ECS_ThrowingGrenade:
+			DebugUtil::PrintMsg(GetOwner(), FString::Printf(TEXT("OnRep_CombatState ECS_ThrowingGrenade")));
 			if (Character && !Character->IsLocallyControlled())
 			{
 				DebugUtil::PrintMsg(Character, FString::Printf(TEXT("OnRep_CombatState ECS_ThrowingGrenade")));
@@ -182,6 +188,7 @@ void UCombatComponent::OnRep_CombatState()
 			}
 			break;
 		case ECombatState::ECS_SwapWeapons:
+			DebugUtil::PrintMsg(GetOwner(), FString::Printf(TEXT("OnRep_CombatState ECS_SwapWeapons")));
 			if (Character && !Character->IsLocallyControlled())		// local的立刻就播放montage了
 			{
 				Character->PlaySwapMontage();
@@ -239,6 +246,7 @@ void UCombatComponent::Fire()
 void UCombatComponent::LocalFire(const FVector_NetQuantize& TraceHitTarget)
 {
 	if (EquippedWeapon == nullptr)	return;
+	// 霰弹枪装弹时可打断
 	if (Character && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
 	{
 		Character->PlayFireMontage(bIsAiming);
@@ -982,6 +990,7 @@ void UCombatComponent::SwapWeapons()
 {
 	if (!Character || !EquippedWeapon || !SecondaryWeapon || CombatState != ECombatState::ECS_UnOccupied)		return;
 	Character->PlaySwapMontage();
+	
 	CombatState = ECombatState::ECS_SwapWeapons;
 	Character->bFinishSwapping = false;
 	DebugUtil::PrintMsg(Character, TEXT("Call SwapWeapons"));
@@ -1061,7 +1070,6 @@ void UCombatComponent::LaunchGrenade()
 	{
 		ServerLaunchGrenade(HitTarget);
 	}
-	
 }
 
 void UCombatComponent::FireHitScanWeapon()

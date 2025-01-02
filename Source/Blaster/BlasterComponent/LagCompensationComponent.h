@@ -89,11 +89,14 @@ public:
 	friend class ABlasterCharacter;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	void ShowFramePackage(const FFramePackage& Package, const FColor& Color);
+	void ShowHitBox(const FFramePackage& Package, const FName& BoneName, const FColor& Color);
 	void SaveFramePackage(FFramePackage& Package);
 	
 	FFramePackage InterpFrame(const FFramePackage& OlderFrame, const FFramePackage& YoungerFrame, float HitTime);
 	FFramePackage GetCheckFrame(ABlasterCharacter* HitCharacter, const float HitTime);
 	void SaveFrame();
+
+	// HitScan
 	UFUNCTION(Server, Reliable)
 	void ServerRequestScore(ABlasterCharacter* HitCharacter, const FVector_NetQuantize& TraceStart, const FVector_NetQuantize& HitLocation, const float HitTime, class AWeapon* DamageCauser);
 
